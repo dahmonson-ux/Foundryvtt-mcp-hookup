@@ -88,7 +88,9 @@ No machine-specific absolute paths are required. Configuration should be supplie
 
 Do not expose a development gateway directly to the public internet. Bind locally by default, authenticate every request, use per-agent credentials, and use a secure authenticated tunnel or reverse proxy for remote access.
 
-See [SECURITY.md](SECURITY.md) and [docs/privacy-and-ledger.md](docs/privacy-and-ledger.md).
+See [SECURITY.md](SECURITY.md), [docs/privacy-and-ledger.md](docs/privacy-and-ledger.md), and [docs/configuration-and-secrets.md](docs/configuration-and-secrets.md).
+
+All security-sensitive or machine-specific values in the repository are placeholders. Real passwords, API keys, tokens, tunnel credentials, private addresses, and local paths belong in your local environment or secret manager, never in source control.
 
 ## License
 
