@@ -200,5 +200,6 @@ export interface LedgerRecord {
   resultId?: string;
   correlationId?: string;
   causationId?: string;
+  referenceIds?: string[];
   metadata?: Record<string, unknown>;
 }
