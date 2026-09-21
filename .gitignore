@@ -1,0 +1,30 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local gateway state
+data/
+ledger/
+tmp/
+.cache/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local Foundry data or exports
+foundry-data/
+FoundryVTT/
+worlds/
