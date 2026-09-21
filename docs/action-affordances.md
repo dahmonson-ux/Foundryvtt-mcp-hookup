@@ -21,6 +21,7 @@ Every action should carry, as applicable:
 - `turn_id`
 - `expires_at_state_version`
 - optional approval metadata
+- canonical references for Assistant DM world mutations
 
 ## Combat resolver families
 
