@@ -41,6 +41,14 @@ Ledger observes the lifecycle and records accountability data.
 
 The gateway owns the public contract. The adapter owns Foundry weirdness. The ledger owns accountability. Foundry owns truth.
 
+## Canonical grounding for Assistant DM
+
+Assistant DM world mutations must be grounded in canonical references. Read-only inspection and planning may proceed without references, but executable `dm.*` mutations are filtered out unless trusted resolver/reference code attaches at least one canonical source.
+
+Canonical grounding and authorization are separate checks: a referenced action can still be denied by capability policy.
+
+See [canonical-reference-policy.md](canonical-reference-policy.md) and [dm-affordances.md](dm-affordances.md).
+
 ## Query flow
 
 1. Authenticate the caller at the transport boundary.
