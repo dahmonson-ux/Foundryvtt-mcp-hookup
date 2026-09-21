@@ -54,6 +54,27 @@ export interface ApprovalMetadata {
   policyId?: string;
 }
 
+export type CanonicalSourceType =
+  | "gm_directive"
+  | "campaign_document"
+  | "foundry_document"
+  | "compendium"
+  | "system_rule"
+  | "module_definition"
+  | "asset"
+  | "other";
+
+export interface CanonicalReference {
+  referenceId: string;
+  sourceType: CanonicalSourceType;
+  sourceId: string;
+  locator?: string;
+  version?: string;
+  contentHash?: string;
+  authority?: string;
+  canonical: true;
+}
+
 export interface ActionAffordance {
   actionId: ActionId;
   contractVersion: number;
@@ -71,6 +92,11 @@ export interface ActionAffordance {
   turnId?: TurnId;
   expiresAtStateVersion: StateVersion;
   approval?: ApprovalMetadata;
+  /**
+   * Required for DM world-mutating affordances. References are produced by
+   * trusted resolver/reference code, not invented by the client.
+   */
+  references?: CanonicalReference[];
 }
 
 export interface AvailableActionsResponse {
@@ -87,6 +113,7 @@ export interface ActionProposal {
   type: string;
   parameters?: Record<string, unknown>;
   rationale?: StructuredRationale;
+  references?: CanonicalReference[];
 }
 
 export interface ActionSelection {
