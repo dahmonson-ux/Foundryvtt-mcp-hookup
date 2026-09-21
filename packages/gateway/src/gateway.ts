@@ -21,6 +21,7 @@ import {
   type IdempotencyStore
 } from "./idempotency.js";
 import type { GameAdapter, IdentityProvider } from "./ports.js";
+import { validateCanonicalReferences } from "./reference-policy.js";
 
 interface OfferedAction {
   agentId: AgentId;
@@ -62,7 +63,9 @@ export class GatewayCore {
     }
 
     const candidates = await this.deps.adapter.listCandidateActions(identity, state);
-    const actions = this.deps.resolver.resolve(identity, state, candidates);
+    const actions = this.deps.resolver
+      .resolve(identity, state, candidates)
+      .filter((action) => validateCanonicalReferences(action).allowed);
 
     for (const action of actions) {
       this.offered.set(this.offerKey(agentId, action.actionId), {
@@ -148,6 +151,20 @@ export class GatewayCore {
       );
     }
 
+    const referenceDecision = validateCanonicalReferences(action);
+    if (!referenceDecision.allowed) {
+      return this.rejectAndRemember(
+        identity.agentId,
+        identity.actorId,
+        commandId,
+        selection,
+        fingerprint,
+        referenceDecision.code ?? "CANONICAL_REFERENCE_REQUIRED",
+        referenceDecision.reason ?? "Canonical reference validation failed.",
+        referenceDecision
+      );
+    }
+
     const authorization = this.authorizer.authorize(identity, action);
     if (!authorization.allowed) {
       return this.rejectAndRemember(
@@ -187,7 +204,8 @@ export class GatewayCore {
       status: "AUTHORIZED",
       policyVersion: identity.policyVersion,
       rationale: selection.rationale,
-      decision: authorization
+      decision: authorization,
+      referenceIds: action.references?.map((reference) => reference.referenceId)
     });
 
     await this.appendLedger({
@@ -200,7 +218,8 @@ export class GatewayCore {
       stateVersion: state.stateVersion,
       turnId: state.turnId,
       status: "VALIDATED",
-      policyVersion: identity.policyVersion
+      policyVersion: identity.policyVersion,
+      referenceIds: action.references?.map((reference) => reference.referenceId)
     });
 
     await this.appendLedger({
@@ -213,7 +232,8 @@ export class GatewayCore {
       stateVersion: state.stateVersion,
       turnId: state.turnId,
       status: "EXECUTING",
-      policyVersion: identity.policyVersion
+      policyVersion: identity.policyVersion,
+      referenceIds: action.references?.map((reference) => reference.referenceId)
     });
 
     let result: ActionResult;
@@ -276,6 +296,7 @@ export class GatewayCore {
       policyVersion: identity.policyVersion,
       rationale: selection.rationale,
       resultId: result.resultId,
+      referenceIds: action.references?.map((reference) => reference.referenceId),
       metadata: result.code ? { code: result.code } : undefined
     });
 
