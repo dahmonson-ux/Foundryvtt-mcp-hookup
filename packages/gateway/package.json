@@ -1,0 +1,14 @@
+{
+  "name": "@foundry-ai-gateway/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@foundry-ai-gateway/contracts": "0.1.0",
+    "@foundry-ai-gateway/affordances": "0.1.0",
+    "@foundry-ai-gateway/ledger": "0.1.0"
+  }
+}
