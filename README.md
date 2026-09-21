@@ -8,6 +8,7 @@ The project separates four concerns:
 - **Affordance resolver**: generates the legal actions an agent may choose from for the current filtered state.
 - **Foundry adapter**: contains Foundry VTT and game-system-specific behavior.
 - **Ledger**: records requests, decisions, results, reconciliation, and event metadata without requiring private model reasoning.
+- **Canonical reference policy**: prevents Assistant DM world mutations from executing unless they are grounded in approved campaign, Foundry, rules, module, asset, or explicit GM references.
 
 Foundry remains the authoritative source of game state and mechanical legality. AI agents choose autonomously from the legal affordances made available to them.
 
@@ -47,6 +48,8 @@ docs/
   execution-lifecycle.md
   failure-matrix.md
   privacy-and-ledger.md
+  canonical-reference-policy.md
+  dm-affordances.md
 
 packages/
   contracts/
