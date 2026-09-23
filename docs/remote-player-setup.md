@@ -8,7 +8,7 @@ If you are running the AI and Foundry locally on the same machine, you do not ne
 
 The AI does **not** take over the player's browser session and it does not remotely control PowerShell.
 
-Instead, the AI runner uses the same existing player-facing Foundry REST relay that the player can use, but with a **separate integration API key** scoped to that player's Foundry user and world.
+Instead, the AI runner uses the **same existing player-facing Foundry REST relay and the same scoped API key the player already uses**. It is not a separate API.
 
 ```text
 REMOTE PLAYER COMPUTER
@@ -18,7 +18,7 @@ Human player
 
 AI / Pawn runner
   -> same player-facing REST relay URL
-  -> separate player-scoped API key
+  -> same player API key
   -> same Foundry user permission boundary
   -> selected Pawn Actor
 ```
@@ -42,7 +42,7 @@ Give the player:
 2. Ownership/control of their human PC Actor.
 3. Ownership/control of their Pawn Actor.
 4. The existing player-facing relay URL.
-5. A **separate API key for the AI integration**, scoped to that player's Foundry user and world.
+5. The player's existing scoped API key for that Foundry user and world.
 6. The UUID of the Pawn Actor they want the AI to control.
 
 Do not give a normal player a GM-scoped key.
@@ -78,7 +78,7 @@ Later, the same runner could be packaged as a desktop app, tray app, Windows ser
 
 A shell is not required if the AI platform itself can securely call the player-scoped relay API and safely hold the player's integration key. In that design, the AI service could call the relay directly.
 
-For this project, the safer default is to keep the player's relay key on the player's computer and let a local runner make the Foundry calls.
+For this project, the default is to keep the player's existing API key on the player's computer and let the local runner make the same API calls on behalf of the Pawn. A second key can still be used if the player wants separate revocation or auditing.
 
 ## Player configuration
 
