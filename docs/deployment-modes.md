@@ -26,7 +26,7 @@ The recommended permission model is:
 
 1. The GM creates/configures the player's normal Foundry user.
 2. That Foundry user receives control of the human PC Actor and the Pawn Actor.
-3. The player receives a separate API key for the AI integration, scoped by the existing player-facing REST relay to that player's Foundry user and target world.
+3. The Pawn runner uses the same player-facing REST relay and the same scoped API key the player already uses for that Foundry user and target world. A separate key is optional, not required.
 4. On the player's computer, the player selects which Actor UUID is the AI-controlled Pawn.
 5. The local Pawn/player script uses the scoped relay key to read and act through the same Foundry permission boundary as that player.
 6. Foundry remains authoritative about what that player can read or modify.
@@ -40,7 +40,7 @@ Human player
 AI / Pawn
   -> existing player/Pawn scripts
   -> PlayerRelayClient
-  -> player-scoped API key
+  -> same player API key
   -> existing Foundry REST relay
   -> Foundry user permissions
   -> selected Pawn Actor
@@ -76,13 +76,13 @@ On the remote player's computer:
 
 ```text
 FOUNDRY_RELAY_URL=https://<existing-player-relay>
-FOUNDRY_RELAY_API_KEY=<player-scoped-integration-key>
+FOUNDRY_RELAY_API_KEY=<player-api-key>
 AI_ACTOR_UUID=Actor.<pawn-id>
 ```
 
 The API key should be scoped to the player's Foundry user and world by the relay. The client should not send user or world overrides to escape that scope.
 
-A separate key for the AI integration is preferred over reusing another player utility's key so it can be revoked independently.
+The same player API key may be reused by the Pawn runner. A dedicated second key is only an optional operational choice for independent revocation or auditing.
 
 ## Code path in this repository
 
