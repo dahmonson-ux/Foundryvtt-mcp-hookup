@@ -1,18 +1,19 @@
 # Architecture
 
-## Permanent boundary
+## Permanent gateway boundary
+
+Above the Foundry bridge, local/solo and remote-player modes use the same gateway model.
 
 ```text
 AI / human clients
         |
- REST / MCP / WebSocket adapters
+ REST / MCP / other thin adapters
         |
         v
 +-----------------------------+
-| Gateway                     |
+| GatewayCore                 |
 | identity                    |
 | capabilities                |
-| visibility                  |
 | stale-state validation      |
 | idempotency                 |
 | lifecycle / reconciliation  |
@@ -27,19 +28,132 @@ AI / human clients
               |
               v
 +-----------------------------+
-| Foundry adapter             |
-| Foundry + game-system       |
-| implementation details      |
+| FoundryGameAdapter          |
 +-------------+---------------+
               |
               v
-          Foundry VTT
-       authoritative truth
-
-Ledger observes the lifecycle and records accountability data.
+        FoundryBridge
 ```
 
-The gateway owns the public contract. The adapter owns Foundry weirdness. The ledger owns accountability. Foundry owns truth.
+The bridge implementation changes by deployment mode.
+
+## Solo / local bridge
+
+When Foundry and the AI tooling are in the same local environment:
+
+```text
+FoundryBridge
+   |
+local module/API/MCP integration
+   |
+Foundry VTT
+```
+
+## Remote-player shared-controller bridge
+
+When Foundry is remote but a human player is already logged into the game in a browser:
+
+```text
+FoundryBridge
+   |
+PlayerClientBridge
+   |
+PlayerClientTransport
+   |
+local-only companion channel
+   |
+player-side Foundry module
+   |
+authenticated Foundry browser session
+   |
+remote Foundry server
+```
+
+The browser session is the remote Foundry connection.
+
+The local MCP/Pawn runner does not receive the player's Foundry password, cookie, API key, or browser session token.
+
+## Shared-controller model
+
+A single Foundry user may control both the human PC and AI Pawn:
+
+```text
+same Foundry user/session
+        |
+   +----+----+
+   |         |
+ human       AI
+   |         |
+ PC Actor  Pawn Actor
+```
+
+The AI is bound to one configured Actor.
+
+The browser-side module must verify the current Foundry user can control that Actor before returning state or executing any action.
+
+## Player Client Bridge contract
+
+`PlayerClientBridge` implements the existing `FoundryBridge` interface.
+
+That preserves the same four gateway-level operations:
+
+```text
+getAvailableActions
+executeAction
+proposeAction
+reconcileAction
+```
+
+The browser-side companion protocol is narrower:
+
+```text
+read_filtered_state
+list_legal_actions
+execute_action
+reconcile_action
+resolve_proposal
+```
+
+The bridge does not provide arbitrary JavaScript execution.
+
+## Query flow
+
+### Local/solo
+
+1. Authenticate the caller at the local transport boundary.
+2. Resolve the agent identity to an Actor and capability policy.
+3. Read authoritative state through the local Foundry bridge.
+4. Filter state.
+5. Resolve legal affordances.
+6. Return state-bound actions.
+
+### Remote player
+
+1. Local MCP resolves the AI identity to the configured Pawn Actor.
+2. `PlayerClientBridge` checks that identity matches the configured Actor.
+3. The player-side Foundry module checks that the current `game.user` can control that Actor.
+4. The module reads only state visible to the authenticated player.
+5. Legal actions are derived for that Actor and current state.
+6. Gateway returns state-bound actions to the AI.
+
+## Execution flow
+
+1. Agent selects an offered `action_id`.
+2. Gateway verifies identity, Actor scope, state version, turn, expiry, capability, and idempotency.
+3. The Foundry bridge re-checks authoritative legality.
+4. In remote-player mode, the browser-side module re-checks current user control of the configured Actor.
+5. Foundry executes the mechanics.
+6. Gateway returns `SUCCEEDED`, `REJECTED`, `FAILED`, or `UNKNOWN`.
+7. Unknown outcomes are reconciled before retry.
+8. State changes expire prior affordances.
+
+## Human and AI concurrency
+
+Human and AI input may coexist when they operate different Actors.
+
+If the human manually changes or operates the Pawn Actor, that state change must invalidate stale AI affordances.
+
+The AI must request fresh state before acting again.
 
 ## Canonical grounding for Assistant DM
 
@@ -49,31 +163,11 @@ Canonical grounding and authorization are separate checks: a referenced action c
 
 See [canonical-reference-policy.md](canonical-reference-policy.md) and [dm-affordances.md](dm-affordances.md).
 
-## Query flow
-
-1. Authenticate the caller at the transport boundary.
-2. Resolve the agent identity to an actor and capability policy.
-3. Read current authoritative state from Foundry.
-4. Filter the state to what that agent is allowed to know.
-5. Ask the affordance resolver for currently legal choices.
-6. Return state-bound, ephemeral action affordances.
-
-## Execution flow
-
-1. Agent selects an offered `action_id`.
-2. Gateway verifies identity, scope, visibility, state version, turn, expiry, and idempotency.
-3. Adapter re-checks authoritative legality immediately before execution.
-4. Foundry executes mechanics.
-5. Gateway returns `SUCCEEDED`, `REJECTED`, `FAILED`, or `UNKNOWN`.
-6. Unknown outcomes are reconciled before any retry.
-7. Result events and ledger records are emitted.
-8. If state changed, previous affordances expire and must be refreshed.
-
 ## Strategic autonomy
 
 The resolver defines the legal move set. The agent owns the choice.
 
-The gateway must not silently replace a selected action with a strategically preferred action. Ordinary autonomous play should not require human approval unless table policy says it does.
+The gateway must not silently replace a selected action with a strategically preferred action.
 
 ## Visibility is not authorization
 
@@ -81,7 +175,7 @@ Visibility controls what the agent may know.
 
 Authorization controls what the agent may attempt.
 
-An agent seeing another token does not imply permission to modify it. Rejection messages must also avoid leaking hidden information.
+An agent seeing another token does not imply permission to modify it. Rejection messages must avoid leaking hidden information.
 
 ## Events are projections
 
@@ -100,7 +194,7 @@ On sequence gaps, clients request a snapshot or resume instead of guessing.
 
 ## Stable IDs
 
-Public contracts use gateway-owned stable IDs for:
+Public contracts use stable IDs for:
 
 - agents
 - actors
@@ -113,4 +207,4 @@ Public contracts use gateway-owned stable IDs for:
 - events
 - ledger records
 
-Foundry document IDs remain adapter metadata.
+Foundry-specific document details remain inside the adapter/bridge boundary.
