@@ -1,20 +1,21 @@
 # Foundry VTT AI Gateway
 
-A provider-neutral gateway architecture for connecting AI-controlled characters and assistants to Foundry Virtual Tabletop through a small, capability-scoped public contract.
+A provider-neutral gateway architecture for connecting AI-controlled characters and assistants to Foundry Virtual Tabletop while keeping Foundry authoritative for state, permissions, and mechanics.
 
-The project separates four concerns:
+The project separates these concerns:
 
-- **Gateway**: public contract, identity, capability checks, visibility, stale-state validation, idempotency, and command lifecycle.
+- **Gateway**: identity, capability checks, stale-state validation, idempotency, and command lifecycle.
 - **Affordance resolver**: generates the legal actions an agent may choose from for the current filtered state.
-- **Foundry adapter**: contains Foundry VTT and game-system-specific behavior.
-- **Ledger**: records requests, decisions, results, reconciliation, and event metadata without requiring private model reasoning.
-- **Canonical reference policy**: prevents Assistant DM world mutations from executing unless they are grounded in approved campaign, Foundry, rules, module, asset, or explicit GM references.
+- **Foundry adapter**: isolates Foundry VTT and game-system-specific behavior.
+- **Player Client Bridge**: lets a remote player's AI share that player's already-authenticated Foundry browser session.
+- **Ledger**: records requests, decisions, results, reconciliation, and event metadata without storing private model reasoning.
+- **Canonical reference policy**: grounds Assistant DM world mutations in approved campaign, Foundry, rules, module, asset, or explicit GM references.
 
-Foundry remains the authoritative source of game state and mechanical legality. AI agents choose autonomously from the legal affordances made available to them.
+Foundry remains the authoritative source of game state and mechanical legality. AI agents choose from the legal affordances made available to them.
 
 ## Core contract
 
-The public surface is intentionally small:
+The public gateway surface stays intentionally small:
 
 ```text
 getAvailableActions(agent_id, state_version?)
@@ -23,20 +24,132 @@ proposeAction(agent_id, proposal, state_version, idempotency_key)
 reconcileAction(command_id, idempotency_key)
 ```
 
-REST, MCP, WebSocket, or other transports should adapt to these same core operations rather than implement separate game logic.
+MCP, REST, WebSocket, or other transports should adapt to those same operations rather than implement separate game logic.
+
+## Deployment modes
+
+### Solo / local
+
+Use this when Foundry and the AI tooling are running on the same machine or trusted local environment.
+
+```text
+AI / Pawn
+  -> local MCP / gateway
+  -> FoundryGameAdapter
+  -> local FoundryBridge
+  -> Foundry VTT
+```
+
+### Remote player shared-controller
+
+Use this when Foundry is remote but the human player is already connected to the game in a browser.
+
+The player and AI share the same authenticated Foundry client session:
+
+```text
+REMOTE FOUNDRY SERVER
+        ^
+        | normal authenticated game connection
+        |
+PLAYER BROWSER
+  Foundry client + player-side module
+        ^
+        | local-only companion channel
+        |
+LOCAL MCP / PAWN RUNNER
+        ^
+        |
+       AI
+```
+
+The human continues controlling their PC normally. The AI is bound to a second Actor that the same Foundry user can control.
+
+Example:
+
+```text
+Foundry user: Alice
+  controls -> Actor.AlicePC
+  controls -> Actor.AlicePawn
+
+Human -> Actor.AlicePC
+AI    -> Actor.AlicePawn
+```
+
+The local runner only needs:
+
+```env
+AI_ACTOR_UUID=Actor.AlicePawn
+```
+
+The browser-side module must verify that the currently logged-in Foundry user can actually control that Actor.
+
+**No Foundry password, API key, cookie, or browser session token is copied into the local MCP/Pawn runner.**
+
+See:
+
+- [docs/deployment-modes.md](docs/deployment-modes.md)
+- [docs/player-client-setup.md](docs/player-client-setup.md)
+- [docs/player-client-bridge.md](docs/player-client-bridge.md)
+
+## Why the Player Client Bridge exists
+
+A remote player already has an authenticated connection to the remote Foundry server in their browser. The AI does not need a second internet-facing API path just to control that player's Pawn.
+
+Instead:
+
+```text
+AI
+  -> local MCP
+  -> PlayerClientBridge
+  -> player-side Foundry module
+  -> existing authenticated browser session
+  -> remote Foundry server
+```
+
+The bridge should attach to Foundry's client/module layer, not screen-scrape pixels or automate DOM clicks.
+
+The Player Client Bridge implementation is:
+
+```text
+packages/adapters/foundry/src/player-client-bridge.ts
+```
+
+It implements the existing `FoundryBridge` interface, so the gateway above it does not need a separate remote-player contract.
+
+## Browser-side bridge responsibilities
+
+The player-side Foundry module must expose a narrow local operation set:
+
+```text
+read_filtered_state
+list_legal_actions
+execute_action
+reconcile_action
+resolve_proposal   # optional
+```
+
+For every request, it must verify:
+
+- the Foundry browser session is still authenticated,
+- the configured AI Actor is controllable by the current `game.user`,
+- the action is scoped to that Actor,
+- the action is still legal for the current state and turn.
+
+Do not expose arbitrary JavaScript execution to the AI.
 
 ## Design principles
 
-- Do not expose raw Foundry documents as the public API.
+- Do not expose raw Foundry documents as the public AI API.
 - Separate visibility from authorization.
 - Treat action IDs as ephemeral and state-bound.
 - Treat events as ordered projections, not truth.
 - Never blindly retry an action with an unknown execution status.
-- Keep strategic choice with the AI agent; the gateway enforces the lawful action space.
+- Keep strategic choice with the AI agent; the gateway enforces the legal action space.
 - Keep rolls, damage, saves, conditions, resource consumption, and similar consequences out of the agent's strategic command set.
-- Use stable public IDs and keep Foundry document IDs inside the adapter.
-- Do not record hidden chain-of-thought. Structured rationale is optional client-supplied metadata only.
-- Keep secrets, local paths, prompts, and private player data out of source control.
+- Use stable public IDs and keep Foundry implementation details inside the adapter boundary.
+- Do not record hidden chain-of-thought.
+- Keep secrets, local paths, prompts, private player data, and browser session credentials out of source control.
+- In remote-player mode, keep the local companion endpoint loopback-only.
 
 ## Repository layout
 
@@ -50,6 +163,10 @@ docs/
   privacy-and-ledger.md
   canonical-reference-policy.md
   dm-affordances.md
+  deployment-modes.md
+  player-client-setup.md
+  player-client-bridge.md
+  transport-adapters.md
 
 packages/
   contracts/
@@ -57,53 +174,32 @@ packages/
   affordances/
   adapters/
     foundry/
+      src/
+        player-client-bridge.ts
     mock/
   ledger/
 ```
 
-## Status
+## Current status
 
-The repository currently provides the contract, resolver taxonomy, execution lifecycle, reference TypeScript implementation, a mock adapter, and tests for the first vertical slice. The Foundry adapter is intentionally isolated so Foundry-specific execution can evolve without changing the public gateway contract.
+The repository currently provides:
 
-This is **not yet a complete Foundry + MCP install**. There is no standalone MCP/REST/WebSocket server process, no automatic `.env` loader, and no concrete `FoundryBridge` implementation that opens a connection to a running world.
+- provider-neutral contracts,
+- capability-aware affordance resolution,
+- execution lifecycle and idempotency,
+- canonical-reference checks,
+- in-memory ledger,
+- mock adapter and tests,
+- Foundry adapter boundary,
+- Player Client Bridge contract and Actor-scope checks.
 
-## Deployment modes
+Still to implement for the shared-controller remote-player path:
 
-There are now two intended deployment paths:
+1. the actual player-side Foundry module,
+2. a loopback `PlayerClientTransport`,
+3. the local MCP/Pawn runner that uses that transport.
 
-### Solo / local
-
-If you are running Foundry and the AI tooling yourself on the same computer or trusted local environment, keep everything local:
-
-```text
-AI / Pawn
-  -> local gateway / existing local scripts
-  -> FoundryGameAdapter
-  -> local FoundryBridge
-  -> Foundry VTT
-```
-
-You do **not** need the remote player relay, a player-scoped relay API key, or a public MCP tunnel for this mode.
-
-### Remote player + AI Pawn
-
-The internet relay path is only needed for a player running their Pawn/AI from another computer.
-
-Give that player's Foundry user control of both their human PC Actor and their Pawn Actor. The player's AI integration uses the **same player-facing Foundry API/relay and the player's existing scoped API key**. The only extra local choice is which owned Actor is the Pawn:
-
-```text
-Remote player's AI
-  -> existing player/Pawn scripts
-  -> PlayerRelayClient
-  -> same player API key
-  -> existing Foundry REST relay
-  -> Foundry user permissions
-  -> selected Pawn Actor
-```
-
-The Actor selection does not create permission. Foundry's existing user/Actor ownership remains authoritative.
-
-See [docs/deployment-modes.md](docs/deployment-modes.md) for the architecture and [docs/remote-player-setup.md](docs/remote-player-setup.md) for the player-facing setup guide.
+The repository does **not** yet contain a finished one-command remote-player runner.
 
 ## Development
 
@@ -112,244 +208,137 @@ Requirements:
 - Node.js 20+
 - npm 10+
 
-Install and run tests:
+Install:
 
 ```bash
 npm install
+```
+
+Run tests:
+
+```bash
 npm test
 ```
 
-Type-check the workspace:
+Type-check:
 
 ```bash
 npm run typecheck
 ```
 
-The current test suite does not require any `.env` values.
-
-No machine-specific absolute paths are required. Configuration should be supplied through environment variables or relative paths.
-
-## Configure it for your setup
-
-This repository intentionally does **not** contain a user's Foundry address, credentials, machine paths, agent keys, tunnel information, or private campaign data.
-
-`.env.example` now separates **local/solo gateway values** from **remote-player relay values**.
-
-For local/solo use, copying `.env.example` to `.env` still does **not** change runtime behavior by itself because nothing in this repository currently starts a server or automatically loads `.env`.
-
-For remote-player use, the reusable client helper reads `FOUNDRY_RELAY_URL`, `FOUNDRY_RELAY_API_KEY`, and `AI_ACTOR_UUID` when the existing player/Pawn scripts call `loadPlayerRelayConfig()`.
-
-### What is required at each stage
-
-| Stage | Required configuration |
-| --- | --- |
-| Run the current tests | Nothing in `.env` |
-| Solo/local AI on the Foundry host | Existing local Foundry/MCP/bridge path; no player relay key required |
-| Write/start your own gateway server | `GATEWAY_AUTH_SECRET` plus whatever host/port settings your server uses |
-| Connect a local Foundry bridge | `FOUNDRY_BASE_URL` plus whatever credentials that bridge actually requires |
-| Remote player + AI Pawn | `FOUNDRY_RELAY_URL`, a player-scoped `FOUNDRY_RELAY_API_KEY`, and `AI_ACTOR_UUID` |
-| Use a shared-secret local Foundry module/bridge | `FOUNDRY_BRIDGE_SECRET`, only if your implementation uses one |
-| Authenticate agents on a custom transport | Transport-owned credentials such as the `AGENT_*_API_KEY` examples |
-| Expose your own custom gateway remotely | `REMOTE_GATEWAY_URL` / `REMOTE_GATEWAY_TOKEN`, only if you deliberately use that path |
-
-The `AGENT_*_API_KEY` values are examples in `.env.example`; they are **not read by `loadGatewayConfig()`**. Your transport/authentication layer owns those credentials and must map an authenticated credential to an `IdentityProvider` result before the request reaches `GatewayCore`.
-
-For the remote-player relay path, the Pawn runner can reuse the same scoped API key the player already uses for that Foundry user/world. A separate key is optional for revocation/auditing, not required by the architecture. The remote client deliberately does not send `userId` or `clientId` overrides.
-
-### 1. Create a local environment template
-
-Copy `.env.example` to a local `.env` file if you want a local place to track the values your future server will need.
-
-macOS/Linux:
+Run both:
 
 ```bash
-cp .env.example .env
+npm run check
 ```
 
-PowerShell:
+The current test suite does not require a real Foundry connection.
 
-```powershell
-Copy-Item .env.example .env
-```
+## Configuration
 
-Replace only the placeholders that apply to your deployment.
+Copy `.env.example` to `.env` only for values needed by your deployment.
 
-| Setting | Current owner | When it matters | What you provide |
-| --- | --- | --- | --- |
-| `GATEWAY_AUTH_SECRET` | gateway/server | Once you write a server | A long random secret used for gateway authentication/signing. |
-| `GATEWAY_HOST` | gateway/server | Once you write a server | Bind address. Defaults to `127.0.0.1`. |
-| `GATEWAY_PORT` | gateway/server | Once you write a server | Gateway port. Defaults to `3001`. |
-| `GATEWAY_LOG_LEVEL` | gateway/server | Once you write a server | Logging level. Defaults to `info`. |
-| `FOUNDRY_BASE_URL` | your Foundry bridge | Once you connect Foundry | The URL your bridge uses to reach the running Foundry instance. |
-| `FOUNDRY_BRIDGE_SECRET` | your Foundry bridge | Only if your bridge uses a shared secret | The credential expected by your Foundry-side module/client. |
-| `AGENT_X_API_KEY`, `AGENT_Y_API_KEY`, etc. | your transport/auth layer | Only if you use per-agent keys | Unique credentials mapped to verified agent identities. |
-| `REMOTE_GATEWAY_URL` | remote-access layer | Only for remote access | Public/tunnel/reverse-proxy URL used by the client. |
-| `REMOTE_GATEWAY_TOKEN` | remote-access layer | Only for remote access | Credential required by that remote-access layer, if any. |
+### Solo/local mode
 
-Do **not** commit the real `.env` file.
-
-The reference loader in `packages/gateway/src/config.ts` reads from `process.env`. This repository does not currently include a launcher or `dotenv` bootstrap. Your eventual server process must inject/load those variables itself through its process manager, container configuration, secret manager, shell environment, or an environment-file-aware Node launcher.
-
-### 2. Implement the Foundry bridge
-
-The interface is defined in:
+Relevant settings include:
 
 ```text
-packages/adapters/foundry/src/types.ts
+GATEWAY_HOST
+GATEWAY_PORT
+GATEWAY_LOG_LEVEL
+GATEWAY_AUTH_SECRET
+FOUNDRY_BASE_URL
+FOUNDRY_BRIDGE_SECRET
 ```
 
-Your setup must provide a concrete `FoundryBridge` implementation with exactly these required methods:
+### Remote-player shared-controller mode
+
+The important player-specific setting is:
 
 ```text
-readFilteredState(...)
-listLegalActions(...)
-executeAction(...)
-reconcileAction(...)
+AI_ACTOR_UUID
 ```
 
-`resolveProposal(...)` is optional.
-
-Wrap your implementation with:
+The local companion defaults are documented as:
 
 ```text
-packages/adapters/foundry/src/state-reader.ts
-FoundryGameAdapter
+PLAYER_CLIENT_BRIDGE_HOST=127.0.0.1
+PLAYER_CLIENT_BRIDGE_PORT=3001
 ```
 
-The important missing runtime piece is still a Foundry-side module or authenticated client that actually performs those bridge calls against a running world.
+Those companion settings describe the future local transport implementation. The current `PlayerClientBridge` code is transport-agnostic.
 
-**Setting `FOUNDRY_BASE_URL` and `FOUNDRY_BRIDGE_SECRET` does not create that connection.** Those values only become meaningful after your bridge implementation consumes them.
+Do not place Foundry browser passwords, cookies, session tokens, or API keys in the remote-player bridge configuration.
 
-Keep Foundry document IDs, world-specific details, module-specific calls, and private paths inside this bridge/adapter boundary rather than exposing them through the public gateway contract.
+See [docs/configuration-and-secrets.md](docs/configuration-and-secrets.md).
 
-### 3. Wire authentication to identities
+## Minimum shared-controller wiring
 
-`GatewayCore` receives an `IdentityProvider` through its dependencies.
-
-The reference/mock implementation is:
-
-```text
-packages/adapters/mock/src/index.ts
-StaticIdentityProvider
-```
-
-That is useful for tests and local wiring examples. A real MCP/REST/WebSocket transport should authenticate its credential first, then resolve that caller to the correct `AgentIdentity` and capabilities before invoking the gateway. Do not treat an unverified request-body `agent_id` as proof of identity.
-
-### Remote-player helper
-
-For players connecting from another computer, the repository now includes:
-
-```text
-packages/adapters/foundry/src/player-relay-client.ts
-```
-
-It provides `PlayerRelayClient` and `loadPlayerRelayConfig()` for existing player/Pawn scripts. The helper attaches the player's scoped API key, keeps the Pawn bound to `AI_ACTOR_UUID`, and leaves Foundry permissions authoritative.
-
-This helper is intentionally small. It does not create a second public MCP server and it does not replace the existing player scripts.
-
-The current `main` branch does **not** contain the older player/Pawn runner scripts themselves. Those should be recovered/imported and wired to this helper rather than rewritten.
-
-### 4. Hook your transport to GatewayCore
-
-The core implementation is:
-
-```text
-packages/gateway/src/gateway.ts
-GatewayCore
-```
-
-Your MCP, REST, or WebSocket process should call the same four operations:
-
-```text
-getAvailableActions
-executeAction
-proposeAction
-reconcileAction
-```
-
-For MCP, the recommended public tools are:
-
-```text
-get_available_actions
-execute_action
-propose_action
-reconcile_action
-```
-
-See `docs/transport-adapters.md` for mapping rules.
-
-Your AI client's configuration should point to **your running transport**, not directly to raw Foundry documents.
-
-### Minimum wiring example
-
-The constructors already in this repository are enough to show the seam between the mock path and a real Foundry bridge:
+The same gateway can use a browser-session bridge:
 
 ```ts
 import { GatewayCore } from "@foundry-ai-gateway/gateway";
 import { DefaultAffordanceResolver } from "@foundry-ai-gateway/affordances";
 import { InMemoryActionLedger } from "@foundry-ai-gateway/ledger";
-import {
-  MockGameAdapter,
-  StaticIdentityProvider
-} from "@foundry-ai-gateway/adapter-mock";
+import { StaticIdentityProvider } from "@foundry-ai-gateway/adapter-mock";
 import {
   FoundryGameAdapter,
-  type FoundryBridge
+  PlayerClientBridge,
+  type PlayerClientTransport
 } from "@foundry-ai-gateway/adapter-foundry";
 
+const actorId = "Actor.AlicePawn";
+
 const identityProvider = new StaticIdentityProvider([{
-  agentId: "pawn_1",
-  actorId: "actor_pawn",
+  agentId: "pawn_alice",
+  actorId,
   policyVersion: 1,
   capabilities: [{ capability: "combat.*", scope: "self" }]
 }]);
 
-const common = {
-  identityProvider,
-  resolver: new DefaultAffordanceResolver(),
-  ledger: new InMemoryActionLedger()
-};
+export function buildPlayerGateway(transport: PlayerClientTransport) {
+  const bridge = new PlayerClientBridge(transport, { actorId });
 
-export const mockGateway = new GatewayCore({
-  ...common,
-  adapter: new MockGameAdapter({ actorId: "actor_pawn" })
-});
-
-export function buildFoundryGateway(bridge: FoundryBridge) {
   return new GatewayCore({
-    ...common,
+    identityProvider,
+    resolver: new DefaultAffordanceResolver(),
+    ledger: new InMemoryActionLedger(),
     adapter: new FoundryGameAdapter(bridge)
   });
 }
 ```
 
-The second constructor does not create the bridge. Your code must still supply the concrete `FoundryBridge` that talks to the running Foundry world.
+The missing piece in that example is the real local transport connected to the player-side Foundry module.
 
-### 5. Verify in this order
+## First remote-player vertical slice
 
-Use the mock path first, then narrow the live surface:
+Test one player and one Pawn first:
 
-1. Run `npm test` against the mock adapter.
-2. Recover/import the existing player/Pawn scripts.
-3. For remote players, wire those scripts to `PlayerRelayClient` and a disposable/test world.
-4. Test one remote Pawn with only `move`, `attack`, `wait`, and `end_turn`.
-5. Connect a real remote player.
-6. Keep solo/local AI on the local bridge/MCP path.
-7. Connect a live campaign last.
+```text
+combat.move
+combat.attack
+combat.wait
+combat.end_turn
+```
 
-Do not begin integration testing with Assistant DM world mutations. The canonical reference policy intentionally rejects ungrounded `dm.*` writes even when the bridge itself is functioning.
+Then add the remaining combat/world actions.
 
-For Assistant DM behavior, see `docs/canonical-reference-policy.md` and `docs/dm-affordances.md`.
-
-For more detail, see [docs/configuration-and-secrets.md](docs/configuration-and-secrets.md), [docs/transport-adapters.md](docs/transport-adapters.md), and [docs/architecture.md](docs/architecture.md).
+Do not begin with Assistant DM world mutations. Canonical reference rules still apply to `dm.*` actions.
 
 ## Security
 
-Do not expose a development gateway directly to the public internet. Bind locally by default, authenticate every request, use per-agent credentials, and use a secure authenticated tunnel or reverse proxy for remote access.
+Do not expose the player-client bridge to the public internet.
 
-See [SECURITY.md](SECURITY.md), [docs/privacy-and-ledger.md](docs/privacy-and-ledger.md), and [docs/configuration-and-secrets.md](docs/configuration-and-secrets.md).
+For remote-player mode:
 
-All security-sensitive or machine-specific values in the repository are placeholders. Real passwords, API keys, tokens, tunnel credentials, private addresses, and local paths belong in your local environment or secret manager, never in source control.
+- keep the companion channel on loopback,
+- keep browser authentication inside the Foundry browser session,
+- verify Actor control on every operation,
+- invalidate stale actions when state changes,
+- do not expose arbitrary JavaScript execution,
+- do not copy browser session credentials into the AI process.
+
+See [SECURITY.md](SECURITY.md).
 
 ## License
 
