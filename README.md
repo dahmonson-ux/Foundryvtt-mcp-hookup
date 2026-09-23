@@ -90,6 +90,7 @@ See:
 - [docs/deployment-modes.md](docs/deployment-modes.md)
 - [docs/player-client-setup.md](docs/player-client-setup.md)
 - [docs/player-client-bridge.md](docs/player-client-bridge.md)
+- [docs/player-mcp-browser-script.md](docs/player-mcp-browser-script.md)
 
 ## Why the Player Client Bridge exists
 
@@ -198,6 +199,8 @@ Still to implement for the shared-controller remote-player path:
 1. the actual player-side Foundry module,
 2. a loopback `PlayerClientTransport`,
 3. the local MCP/Pawn runner that uses that transport.
+
+A copyable reference implementation for both sides is in [docs/player-mcp-browser-script.md](docs/player-mcp-browser-script.md).
 
 The repository does **not** yet contain a finished one-command remote-player runner.
 
