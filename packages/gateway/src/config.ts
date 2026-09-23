@@ -5,8 +5,6 @@ export interface GatewayConfig {
   authSecret: string;
   foundryBaseUrl?: string;
   foundryBridgeSecret?: string;
-  remoteGatewayUrl?: string;
-  remoteGatewayToken?: string;
 }
 
 const PLACEHOLDER_PREFIX = "INSERT_";
@@ -53,8 +51,6 @@ export function loadGatewayConfig(
     logLevel: env.GATEWAY_LOG_LEVEL?.trim() || "info",
     authSecret: required("GATEWAY_AUTH_SECRET", env),
     foundryBaseUrl: optional("FOUNDRY_BASE_URL", env),
-    foundryBridgeSecret: optional("FOUNDRY_BRIDGE_SECRET", env),
-    remoteGatewayUrl: optional("REMOTE_GATEWAY_URL", env),
-    remoteGatewayToken: optional("REMOTE_GATEWAY_TOKEN", env)
+    foundryBridgeSecret: optional("FOUNDRY_BRIDGE_SECRET", env)
   };
 }
