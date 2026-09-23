@@ -65,6 +65,8 @@ packages/
 
 The repository currently provides the contract, resolver taxonomy, execution lifecycle, reference TypeScript implementation, a mock adapter, and tests for the first vertical slice. The Foundry adapter is intentionally isolated so Foundry-specific execution can evolve without changing the public gateway contract.
 
+This is **not yet a complete Foundry + MCP install**. There is no standalone MCP/REST/WebSocket server process, no automatic `.env` loader, and no concrete `FoundryBridge` implementation that opens a connection to a running world.
+
 ## Development
 
 Requirements:
@@ -85,17 +87,32 @@ Type-check the workspace:
 npm run typecheck
 ```
 
+The current test suite does not require any `.env` values.
+
 No machine-specific absolute paths are required. Configuration should be supplied through environment variables or relative paths.
 
 ## Configure it for your setup
 
-This repository intentionally does **not** contain a user's Foundry address, credentials, machine paths, agent keys, tunnel information, or private campaign data. Those values must be supplied locally.
+This repository intentionally does **not** contain a user's Foundry address, credentials, machine paths, agent keys, tunnel information, or private campaign data.
 
-The current repository is also a **gateway core/reference implementation**, not a complete one-command Foundry server. Filling in the environment variables is only the configuration step. A real deployment must also provide a Foundry bridge and a transport such as MCP, REST, or WebSocket.
+`.env.example` is a configuration template only. Copying it to `.env` and filling in placeholders does **not** change runtime behavior by itself because nothing in this repository currently loads `.env` or starts a transport process. Until you add a server/transport, those values are documentation for the deployment you are going to build.
 
-### 1. Create your local environment file
+### What is required at each stage
 
-Copy `.env.example` to a local `.env` file.
+| Stage | Required configuration |
+| --- | --- |
+| Run the current tests | Nothing in `.env` |
+| Write/start a gateway server | `GATEWAY_AUTH_SECRET` plus whatever host/port settings your server uses |
+| Connect a real Foundry bridge | `FOUNDRY_BASE_URL` plus whatever credentials that bridge actually requires |
+| Use a shared-secret Foundry module/bridge | `FOUNDRY_BRIDGE_SECRET`, only if your implementation uses one |
+| Authenticate individual agents | Transport-owned credentials such as the `AGENT_*_API_KEY` examples |
+| Add remote access | `REMOTE_GATEWAY_URL` / `REMOTE_GATEWAY_TOKEN`, only if your remote-access layer uses them |
+
+The `AGENT_*_API_KEY` values are examples in `.env.example`; they are **not read by `loadGatewayConfig()`**. Your transport/authentication layer owns those credentials and must map an authenticated credential to an `IdentityProvider` result before the request reaches `GatewayCore`.
+
+### 1. Create a local environment template
+
+Copy `.env.example` to a local `.env` file if you want a local place to track the values your future server will need.
 
 macOS/Linux:
 
@@ -109,35 +126,33 @@ PowerShell:
 Copy-Item .env.example .env
 ```
 
-Replace the `INSERT_...` placeholders that apply to your setup.
+Replace only the placeholders that apply to your deployment.
 
-| Setting | Where to set it | Required? | What you provide |
+| Setting | Current owner | When it matters | What you provide |
 | --- | --- | --- | --- |
-| `GATEWAY_AUTH_SECRET` | local `.env` | **Yes** | A long random secret used by the gateway for authentication/signing. |
-| `GATEWAY_HOST` | local `.env` | No | Bind address. Defaults to `127.0.0.1`. |
-| `GATEWAY_PORT` | local `.env` | No | Gateway port. Defaults to `3001`. |
-| `GATEWAY_LOG_LEVEL` | local `.env` | No | Logging level. Defaults to `info`. |
-| `FOUNDRY_BASE_URL` | local `.env` | Needed for a real Foundry connection | The URL your bridge uses to reach your Foundry instance, for example your local/LAN Foundry URL. |
-| `FOUNDRY_BRIDGE_SECRET` | local `.env` | Only if your bridge requires it | Shared secret/token expected by your Foundry-side bridge or module. |
-| `AGENT_X_API_KEY`, `AGENT_Y_API_KEY`, etc. | local `.env` or secret manager | Only if your transport uses per-agent keys | Unique credentials for each AI agent. Rename/add entries to match your actual agents. The reference gateway config does not consume these automatically; your transport/auth layer must wire them in. |
-| `REMOTE_GATEWAY_URL` | local `.env` | Only for remote access | Public/tunnel/reverse-proxy URL used by your client. |
-| `REMOTE_GATEWAY_TOKEN` | local `.env` | Only for remote access | Credential required by that remote-access layer, if any. |
+| `GATEWAY_AUTH_SECRET` | gateway/server | Once you write a server | A long random secret used for gateway authentication/signing. |
+| `GATEWAY_HOST` | gateway/server | Once you write a server | Bind address. Defaults to `127.0.0.1`. |
+| `GATEWAY_PORT` | gateway/server | Once you write a server | Gateway port. Defaults to `3001`. |
+| `GATEWAY_LOG_LEVEL` | gateway/server | Once you write a server | Logging level. Defaults to `info`. |
+| `FOUNDRY_BASE_URL` | your Foundry bridge | Once you connect Foundry | The URL your bridge uses to reach the running Foundry instance. |
+| `FOUNDRY_BRIDGE_SECRET` | your Foundry bridge | Only if your bridge uses a shared secret | The credential expected by your Foundry-side module/client. |
+| `AGENT_X_API_KEY`, `AGENT_Y_API_KEY`, etc. | your transport/auth layer | Only if you use per-agent keys | Unique credentials mapped to verified agent identities. |
+| `REMOTE_GATEWAY_URL` | remote-access layer | Only for remote access | Public/tunnel/reverse-proxy URL used by the client. |
+| `REMOTE_GATEWAY_TOKEN` | remote-access layer | Only for remote access | Credential required by that remote-access layer, if any. |
 
 Do **not** commit the real `.env` file.
 
-The reference loader in `packages/gateway/src/config.ts` reads values from `process.env`. This repository does not currently include a standalone launcher that automatically loads `.env`, so your eventual server/transport process must load those variables itself, for example through its process manager, container configuration, secret manager, or an environment-file-aware Node launcher.
+The reference loader in `packages/gateway/src/config.ts` reads from `process.env`. This repository does not currently include a launcher or `dotenv` bootstrap. Your eventual server process must inject/load those variables itself through its process manager, container configuration, secret manager, shell environment, or an environment-file-aware Node launcher.
 
-### 2. Implement the bridge to your Foundry installation
+### 2. Implement the Foundry bridge
 
-The Foundry-facing seam is:
+The interface is defined in:
 
 ```text
 packages/adapters/foundry/src/types.ts
 ```
 
-Your integration must provide a concrete implementation of the `FoundryBridge` interface and connect it to the Foundry module/API mechanism you choose.
-
-It must implement:
+Your setup must provide a concrete `FoundryBridge` implementation with exactly these required methods:
 
 ```text
 readFilteredState(...)
@@ -146,19 +161,44 @@ executeAction(...)
 reconcileAction(...)
 ```
 
-It may also implement:
+`resolveProposal(...)` is optional.
+
+Wrap your implementation with:
 
 ```text
-resolveProposal(...)
+packages/adapters/foundry/src/state-reader.ts
+FoundryGameAdapter
 ```
 
-The provided `FoundryGameAdapter` in `packages/adapters/foundry/src/state-reader.ts` delegates to that bridge. In other words, this is where your setup-specific Foundry communication is plugged in. Keep Foundry document IDs, world-specific details, module-specific calls, and private paths inside this adapter/bridge boundary rather than putting them in the public gateway contract.
+The important missing runtime piece is still a Foundry-side module or authenticated client that actually performs those bridge calls against a running world.
 
-### 3. Add the transport your AI client will call
+**Setting `FOUNDRY_BASE_URL` and `FOUNDRY_BRIDGE_SECRET` does not create that connection.** Those values only become meaningful after your bridge implementation consumes them.
 
-The repository defines the gateway operations, but it does not currently ship a standalone MCP/REST/WebSocket server entry point.
+Keep Foundry document IDs, world-specific details, module-specific calls, and private paths inside this bridge/adapter boundary rather than exposing them through the public gateway contract.
 
-Wire your chosen transport to the same four gateway operations:
+### 3. Wire authentication to identities
+
+`GatewayCore` receives an `IdentityProvider` through its dependencies.
+
+The reference/mock implementation is:
+
+```text
+packages/adapters/mock/src/index.ts
+StaticIdentityProvider
+```
+
+That is useful for tests and local wiring examples. A real MCP/REST/WebSocket transport should authenticate its credential first, then resolve that caller to the correct `AgentIdentity` and capabilities before invoking the gateway. Do not treat an unverified request-body `agent_id` as proof of identity.
+
+### 4. Hook your transport to GatewayCore
+
+The core implementation is:
+
+```text
+packages/gateway/src/gateway.ts
+GatewayCore
+```
+
+Your MCP, REST, or WebSocket process should call the same four operations:
 
 ```text
 getAvailableActions
@@ -176,39 +216,68 @@ propose_action
 reconcile_action
 ```
 
-See `docs/transport-adapters.md` for the mapping rules.
+See `docs/transport-adapters.md` for mapping rules.
 
-Your AI client's MCP/API configuration should then point to **your running transport**, using the host/port or remote URL you assigned above. Do not point the model directly at raw Foundry documents or expose a separate tool for every spell, attack, or world action.
+Your AI client's configuration should point to **your running transport**, not directly to raw Foundry documents.
 
-### 4. Define your agents and permissions
+### Minimum wiring example
 
-Your deployment must decide which authenticated identity corresponds to each AI-controlled player, Pawn, Assistant DM, or other agent, and which capabilities that identity receives.
+The constructors already in this repository are enough to show the seam between the mock path and a real Foundry bridge:
 
-Per-agent API keys are transport-specific. If you use them, create unique credentials locally and map each credential to one verified identity before calling the gateway core. Do not trust an `agent_id` supplied only in an unverified request body.
+```ts
+import { GatewayCore } from "@foundry-ai-gateway/gateway";
+import { DefaultAffordanceResolver } from "@foundry-ai-gateway/affordances";
+import { InMemoryActionLedger } from "@foundry-ai-gateway/ledger";
+import {
+  MockGameAdapter,
+  StaticIdentityProvider
+} from "@foundry-ai-gateway/adapter-mock";
+import {
+  FoundryGameAdapter,
+  type FoundryBridge
+} from "@foundry-ai-gateway/adapter-foundry";
 
-For Assistant DM world-building actions, also follow `docs/canonical-reference-policy.md` and `docs/dm-affordances.md`. World mutations are expected to carry approved references rather than inventing ungrounded campaign facts.
+const identityProvider = new StaticIdentityProvider([{
+  agentId: "pawn_1",
+  actorId: "actor_pawn",
+  policyVersion: 1,
+  capabilities: [{ capability: "combat.*", scope: "self" }]
+}]);
 
-### 5. Verify before connecting a live world
+const common = {
+  identityProvider,
+  resolver: new DefaultAffordanceResolver(),
+  ledger: new InMemoryActionLedger()
+};
 
-Run:
+export const mockGateway = new GatewayCore({
+  ...common,
+  adapter: new MockGameAdapter({ actorId: "actor_pawn" })
+});
 
-```bash
-npm run check
+export function buildFoundryGateway(bridge: FoundryBridge) {
+  return new GatewayCore({
+    ...common,
+    adapter: new FoundryGameAdapter(bridge)
+  });
+}
 ```
 
-That runs the TypeScript check and test suite.
+The second constructor does not create the bridge. Your code must still supply the concrete `FoundryBridge` that talks to the running Foundry world.
 
-A practical integration order is:
+### 5. Verify in this order
 
-```text
-mock adapter
-  -> local transport
-  -> real Foundry bridge
-  -> authenticated AI client
-  -> remote/tunnel access only if needed
-```
+Use the mock path first, then narrow the live surface:
 
-This keeps setup-specific failures separate and makes it easier to determine whether a problem is in the gateway core, transport, authentication, or Foundry bridge.
+1. Run `npm test` against the mock adapter.
+2. Unit-test your concrete `FoundryBridge` against a disposable/test world.
+3. Connect one Pawn and expose only the combat slice first: `move`, `attack`, `wait`, and `end_turn`.
+4. Put MCP or REST in front of that tested path.
+5. Connect a live campaign last.
+
+Do not begin integration testing with Assistant DM world mutations. The canonical reference policy intentionally rejects ungrounded `dm.*` writes even when the bridge itself is functioning.
+
+For Assistant DM behavior, see `docs/canonical-reference-policy.md` and `docs/dm-affordances.md`.
 
 For more detail, see [docs/configuration-and-secrets.md](docs/configuration-and-secrets.md), [docs/transport-adapters.md](docs/transport-adapters.md), and [docs/architecture.md](docs/architecture.md).
 
