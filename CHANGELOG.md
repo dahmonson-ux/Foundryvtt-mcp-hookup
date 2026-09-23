@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+Shared-controller remote-player architecture:
+
+- replaced the remote REST-relay client plan with a browser-session `PlayerClientBridge`
+- remote players now share their already-authenticated Foundry browser client with the AI
+- added Actor-scope checks against the current player session
+- removed the relay API client and relay-specific credentials
+- added player-client setup, protocol, transport, security, and deployment documentation
+- kept the local/solo Foundry bridge path unchanged
+- removed legacy remote-gateway configuration fields from the reference config loader
+
 ## 0.1.0
 
 Initial public architecture scaffold:
