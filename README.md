@@ -103,7 +103,7 @@ Remote player's AI
 
 The Actor selection does not create permission. Foundry's existing user/Actor ownership remains authoritative.
 
-See [docs/deployment-modes.md](docs/deployment-modes.md) for the full plan.
+See [docs/deployment-modes.md](docs/deployment-modes.md) for the architecture and [docs/remote-player-setup.md](docs/remote-player-setup.md) for the player-facing setup guide.
 
 ## Development
 
