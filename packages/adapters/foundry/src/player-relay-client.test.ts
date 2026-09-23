@@ -22,32 +22,37 @@ describe("loadPlayerRelayConfig", () => {
 
 describe("PlayerRelayClient", () => {
   it("uses the scoped API key and assigned actor UUID", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ name: "Pawn" }), {
+    let capturedUrl: URL | undefined;
+    let capturedInit: RequestInit | undefined;
+
+    const fetchMock: typeof fetch = vi.fn(async (input, init) => {
+      capturedUrl = input instanceof URL ? input : new URL(String(input));
+      capturedInit = init;
+
+      return new Response(JSON.stringify({ name: "Pawn" }), {
         status: 200,
         headers: { "content-type": "application/json" }
-      })
-    );
+      });
+    });
 
     const client = new PlayerRelayClient({
       baseUrl: "https://relay.example",
       apiKey: "player-key",
       actorUuid: "Actor.pawn123",
-      fetchImpl: fetchMock as unknown as typeof fetch
+      fetchImpl: fetchMock
     });
 
     await client.getAssignedActor();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(capturedUrl).toBeDefined();
 
-    const [input, init] = fetchMock.mock.calls[0]!;
-    const url = input instanceof URL ? input : new URL(String(input));
-    const headers = new Headers(init?.headers);
+    const headers = new Headers(capturedInit?.headers);
 
-    expect(url.pathname).toBe("/get");
-    expect(url.searchParams.get("uuid")).toBe("Actor.pawn123");
+    expect(capturedUrl!.pathname).toBe("/get");
+    expect(capturedUrl!.searchParams.get("uuid")).toBe("Actor.pawn123");
     expect(headers.get("x-api-key")).toBe("player-key");
-    expect(url.searchParams.has("userId")).toBe(false);
-    expect(url.searchParams.has("clientId")).toBe(false);
+    expect(capturedUrl!.searchParams.has("userId")).toBe(false);
+    expect(capturedUrl!.searchParams.has("clientId")).toBe(false);
   });
 });
