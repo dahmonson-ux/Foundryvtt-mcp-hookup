@@ -22,25 +22,25 @@ describe("loadPlayerRelayConfig", () => {
 
 describe("PlayerRelayClient", () => {
   it("uses the scoped API key and assigned actor UUID", async () => {
-    const fetchImpl = vi.fn(async () =>
+    const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ name: "Pawn" }), {
         status: 200,
         headers: { "content-type": "application/json" }
       })
-    ) as unknown as typeof fetch;
+    );
 
     const client = new PlayerRelayClient({
       baseUrl: "https://relay.example",
       apiKey: "player-key",
       actorUuid: "Actor.pawn123",
-      fetchImpl
+      fetchImpl: fetchMock as unknown as typeof fetch
     });
 
     await client.getAssignedActor();
 
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    const [input, init] = fetchImpl.mock.calls[0]!;
+    const [input, init] = fetchMock.mock.calls[0]!;
     const url = input instanceof URL ? input : new URL(String(input));
     const headers = new Headers(init?.headers);
 
