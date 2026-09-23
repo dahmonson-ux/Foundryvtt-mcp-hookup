@@ -89,13 +89,13 @@ You do **not** need the remote player relay, a player-scoped relay API key, or a
 
 The internet relay path is only needed for a player running their Pawn/AI from another computer.
 
-Give that player's Foundry user control of both their human PC Actor and their Pawn Actor. The player's AI integration then uses a **separate player-scoped API key** through the existing Foundry REST relay and selects which owned Actor is the Pawn:
+Give that player's Foundry user control of both their human PC Actor and their Pawn Actor. The player's AI integration uses the **same player-facing Foundry API/relay and the player's existing scoped API key**. The only extra local choice is which owned Actor is the Pawn:
 
 ```text
 Remote player's AI
   -> existing player/Pawn scripts
   -> PlayerRelayClient
-  -> player-scoped relay API key
+  -> same player API key
   -> existing Foundry REST relay
   -> Foundry user permissions
   -> selected Pawn Actor
@@ -154,7 +154,7 @@ For remote-player use, the reusable client helper reads `FOUNDRY_RELAY_URL`, `FO
 
 The `AGENT_*_API_KEY` values are examples in `.env.example`; they are **not read by `loadGatewayConfig()`**. Your transport/authentication layer owns those credentials and must map an authenticated credential to an `IdentityProvider` result before the request reaches `GatewayCore`.
 
-For the remote-player relay path, use a separate integration key scoped to that player's Foundry user and world. The remote client deliberately does not send `userId` or `clientId` overrides.
+For the remote-player relay path, the Pawn runner can reuse the same scoped API key the player already uses for that Foundry user/world. A separate key is optional for revocation/auditing, not required by the architecture. The remote client deliberately does not send `userId` or `clientId` overrides.
 
 ### 1. Create a local environment template
 
