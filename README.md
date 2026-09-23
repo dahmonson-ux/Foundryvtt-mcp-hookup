@@ -67,6 +67,44 @@ The repository currently provides the contract, resolver taxonomy, execution lif
 
 This is **not yet a complete Foundry + MCP install**. There is no standalone MCP/REST/WebSocket server process, no automatic `.env` loader, and no concrete `FoundryBridge` implementation that opens a connection to a running world.
 
+## Deployment modes
+
+There are now two intended deployment paths:
+
+### Solo / local
+
+If you are running Foundry and the AI tooling yourself on the same computer or trusted local environment, keep everything local:
+
+```text
+AI / Pawn
+  -> local gateway / existing local scripts
+  -> FoundryGameAdapter
+  -> local FoundryBridge
+  -> Foundry VTT
+```
+
+You do **not** need the remote player relay, a player-scoped relay API key, or a public MCP tunnel for this mode.
+
+### Remote player + AI Pawn
+
+The internet relay path is only needed for a player running their Pawn/AI from another computer.
+
+Give that player's Foundry user control of both their human PC Actor and their Pawn Actor. The player's AI integration then uses a **separate player-scoped API key** through the existing Foundry REST relay and selects which owned Actor is the Pawn:
+
+```text
+Remote player's AI
+  -> existing player/Pawn scripts
+  -> PlayerRelayClient
+  -> player-scoped relay API key
+  -> existing Foundry REST relay
+  -> Foundry user permissions
+  -> selected Pawn Actor
+```
+
+The Actor selection does not create permission. Foundry's existing user/Actor ownership remains authoritative.
+
+See [docs/deployment-modes.md](docs/deployment-modes.md) for the full plan.
+
 ## Development
 
 Requirements:
@@ -95,20 +133,28 @@ No machine-specific absolute paths are required. Configuration should be supplie
 
 This repository intentionally does **not** contain a user's Foundry address, credentials, machine paths, agent keys, tunnel information, or private campaign data.
 
-`.env.example` is a configuration template only. Copying it to `.env` and filling in placeholders does **not** change runtime behavior by itself because nothing in this repository currently loads `.env` or starts a transport process. Until you add a server/transport, those values are documentation for the deployment you are going to build.
+`.env.example` now separates **local/solo gateway values** from **remote-player relay values**.
+
+For local/solo use, copying `.env.example` to `.env` still does **not** change runtime behavior by itself because nothing in this repository currently starts a server or automatically loads `.env`.
+
+For remote-player use, the reusable client helper reads `FOUNDRY_RELAY_URL`, `FOUNDRY_RELAY_API_KEY`, and `AI_ACTOR_UUID` when the existing player/Pawn scripts call `loadPlayerRelayConfig()`.
 
 ### What is required at each stage
 
 | Stage | Required configuration |
 | --- | --- |
 | Run the current tests | Nothing in `.env` |
-| Write/start a gateway server | `GATEWAY_AUTH_SECRET` plus whatever host/port settings your server uses |
-| Connect a real Foundry bridge | `FOUNDRY_BASE_URL` plus whatever credentials that bridge actually requires |
-| Use a shared-secret Foundry module/bridge | `FOUNDRY_BRIDGE_SECRET`, only if your implementation uses one |
-| Authenticate individual agents | Transport-owned credentials such as the `AGENT_*_API_KEY` examples |
-| Add remote access | `REMOTE_GATEWAY_URL` / `REMOTE_GATEWAY_TOKEN`, only if your remote-access layer uses them |
+| Solo/local AI on the Foundry host | Existing local Foundry/MCP/bridge path; no player relay key required |
+| Write/start your own gateway server | `GATEWAY_AUTH_SECRET` plus whatever host/port settings your server uses |
+| Connect a local Foundry bridge | `FOUNDRY_BASE_URL` plus whatever credentials that bridge actually requires |
+| Remote player + AI Pawn | `FOUNDRY_RELAY_URL`, a player-scoped `FOUNDRY_RELAY_API_KEY`, and `AI_ACTOR_UUID` |
+| Use a shared-secret local Foundry module/bridge | `FOUNDRY_BRIDGE_SECRET`, only if your implementation uses one |
+| Authenticate agents on a custom transport | Transport-owned credentials such as the `AGENT_*_API_KEY` examples |
+| Expose your own custom gateway remotely | `REMOTE_GATEWAY_URL` / `REMOTE_GATEWAY_TOKEN`, only if you deliberately use that path |
 
 The `AGENT_*_API_KEY` values are examples in `.env.example`; they are **not read by `loadGatewayConfig()`**. Your transport/authentication layer owns those credentials and must map an authenticated credential to an `IdentityProvider` result before the request reaches `GatewayCore`.
+
+For the remote-player relay path, use a separate integration key scoped to that player's Foundry user and world. The remote client deliberately does not send `userId` or `clientId` overrides.
 
 ### 1. Create a local environment template
 
@@ -188,6 +234,20 @@ StaticIdentityProvider
 ```
 
 That is useful for tests and local wiring examples. A real MCP/REST/WebSocket transport should authenticate its credential first, then resolve that caller to the correct `AgentIdentity` and capabilities before invoking the gateway. Do not treat an unverified request-body `agent_id` as proof of identity.
+
+### Remote-player helper
+
+For players connecting from another computer, the repository now includes:
+
+```text
+packages/adapters/foundry/src/player-relay-client.ts
+```
+
+It provides `PlayerRelayClient` and `loadPlayerRelayConfig()` for existing player/Pawn scripts. The helper attaches the player's scoped API key, keeps the Pawn bound to `AI_ACTOR_UUID`, and leaves Foundry permissions authoritative.
+
+This helper is intentionally small. It does not create a second public MCP server and it does not replace the existing player scripts.
+
+The current `main` branch does **not** contain the older player/Pawn runner scripts themselves. Those should be recovered/imported and wired to this helper rather than rewritten.
 
 ### 4. Hook your transport to GatewayCore
 
@@ -270,10 +330,12 @@ The second constructor does not create the bridge. Your code must still supply t
 Use the mock path first, then narrow the live surface:
 
 1. Run `npm test` against the mock adapter.
-2. Unit-test your concrete `FoundryBridge` against a disposable/test world.
-3. Connect one Pawn and expose only the combat slice first: `move`, `attack`, `wait`, and `end_turn`.
-4. Put MCP or REST in front of that tested path.
-5. Connect a live campaign last.
+2. Recover/import the existing player/Pawn scripts.
+3. For remote players, wire those scripts to `PlayerRelayClient` and a disposable/test world.
+4. Test one remote Pawn with only `move`, `attack`, `wait`, and `end_turn`.
+5. Connect a real remote player.
+6. Keep solo/local AI on the local bridge/MCP path.
+7. Connect a live campaign last.
 
 Do not begin integration testing with Assistant DM world mutations. The canonical reference policy intentionally rejects ungrounded `dm.*` writes even when the bridge itself is functioning.
 
