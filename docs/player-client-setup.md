@@ -204,4 +204,5 @@ See also:
 
 - [deployment-modes.md](deployment-modes.md)
 - [player-client-bridge.md](player-client-bridge.md)
+- [player-mcp-browser-script.md](player-mcp-browser-script.md)
 - [configuration-and-secrets.md](configuration-and-secrets.md)
