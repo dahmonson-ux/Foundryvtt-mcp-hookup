@@ -1,58 +1,65 @@
 # Privacy and Ledger Design
 
-The ledger is valuable precisely because it can become sensitive. Treat it as security-sensitive data.
+The ledger exists to support reliability and accountability, not to capture private model reasoning.
 
 ## Record
 
 A ledger entry may include:
 
-- ledger record ID
-- command ID
-- event IDs
-- agent and actor stable IDs
-- state and turn versions
-- selected action or visible proposal
-- optional structured rationale supplied by the client
-- capability/policy version
-- authorization and validation outcomes
-- execution status
-- adapter result identifiers
-- consequence summaries
-- reconciliation outcome
-- timestamps and correlation/causation IDs
+- command ID,
+- agent/Actor stable IDs,
+- state/turn versions,
+- selected action,
+- authorization result,
+- execution status,
+- adapter result identifiers,
+- consequence summaries,
+- reconciliation outcome,
+- timestamps/correlation IDs,
+- optional short structured rationale supplied by the client.
 
 ## Do not record by default
 
-- private chain-of-thought
-- raw secrets or API keys
-- authentication tokens
-- machine usernames
-- absolute local filesystem paths
-- tunnel credentials
-- unrelated personal information
-- complete prompts when a smaller structured record is sufficient
+- hidden chain-of-thought,
+- raw secrets/API keys,
+- passwords/session tokens,
+- complete prompts when a smaller record is sufficient,
+- full Character Profiles unless explicitly required,
+- private campaign memory unrelated to debugging the command,
+- unrelated personal information.
 
-## Hidden-state handling
+## Character data
 
-Some ledger records may need to mention that hidden-state checks occurred. Separate operator/GM audit data from player-visible exports so a player cannot infer secret tokens, notes, rolls, or map data from the audit trail.
+Character Profiles and campaign memory may contain private player-authored content.
+
+Keep them logically separate from the action ledger.
+
+The ledger may record a profile/version identifier when useful without duplicating the complete profile.
+
+## Hidden information
+
+Player-visible exports must not leak GM-only or otherwise hidden state through error text or audit metadata.
+
+## Reliability
+
+The ledger should make these events visible:
+
+- duplicate suppression,
+- stale rejection,
+- unknown execution,
+- reconciliation,
+- adapter failures.
 
 ## Retention
 
 Persistent deployments should define:
 
-- retention duration
-- who can inspect each record class
-- export rules
-- redaction behavior
-- deletion/expiration behavior
-- backup handling
-- whether optional rationale is retained
-- whether hidden-state audit fields are retained separately
+- retention duration,
+- access control,
+- export/redaction rules,
+- expiration/deletion,
+- backup handling.
 
-## Reconciliation
+## Source control
 
-The ledger should make duplicate suppression and unknown-state reconciliation visible. A duplicate request should not silently disappear; it should resolve to the original command/result relationship.
-
-## Source control privacy
-
-Repository examples use synthetic identifiers and relative paths. Deployment-specific credentials, local addresses, private prompts, world exports, and machine-specific paths belong outside version control.
+Use synthetic identifiers and examples. Deployment credentials, private profiles, campaign exports, and machine-specific paths belong outside source control.
