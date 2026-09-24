@@ -1,85 +1,70 @@
 # Role-Playing Behavior
 
-This document defines only the minimum behavioral assumptions needed for the game to function smoothly. It deliberately avoids prescribing personality.
+The human player and AI Pawn are separate players in the same Foundry world.
+
+Role-playing association does not imply shared technical control.
 
 ## Exploration and towns
 
-Outside combat, the Pawn accompanies its assigned player by default.
+Outside combat, the Pawn normally accompanies its associated human character.
 
 That means:
 
-- the player leads normal party movement,
-- the Pawn stays with or reasonably near the player,
-- the Pawn does not independently wander away without instruction or a clear character/context reason,
-- movement by the player is treated as shared party context rather than a competing command.
+- the human moves the human Actor through the human route,
+- the AI independently moves the Pawn through the AI route,
+- the Pawn tries to remain with/reasonably near the human,
+- the Pawn may leave when instructed or when character/context supports it.
 
-This avoids a control tug-of-war without requiring a complicated lock system.
+No technical control tug-of-war is expected because the Actors and accounts are separate.
 
 ## Conversations
 
-When the assigned player is part of a conversation, the Pawn receives the relevant conversation as shared context.
+When the associated human/party enters a conversation, relevant visible conversation can be included in Pawn context.
 
 The Pawn may:
 
 - listen,
 - respond,
-- ask a question,
+- ask,
 - react,
 - disagree,
 - joke,
 - remain silent.
 
-Conversation participation is **available, not mandatory**.
+Participation is available, not mandatory.
 
-The infrastructure should never force the Pawn to speak just because a dialogue event exists.
+The Character Profile and AI determine what is natural.
 
-The Character Profile and AI judgment determine whether participation is natural.
+## Instructions
 
-## Temporary independent tasks
+A human may give the Pawn a current instruction, such as:
 
-The player may explicitly send the Pawn to perform a task.
+- "Stay with me."
+- "Talk to the blacksmith."
+- "Watch the door."
+- "Heal me if I go down."
+- "Ask about the missing caravan."
 
-Examples:
+The instruction influences AI priorities but does not become direct control of the AI Foundry account.
 
-- speak to an NPC,
-- investigate a room,
-- watch an entrance,
-- purchase an item,
-- scout a nearby area.
+## Independent tasks
 
-When the task is complete, the Pawn normally returns to companion behavior unless the player or character context says otherwise.
+The Pawn can temporarily act independently through its own AI route.
+
+When the task is finished, it normally resumes companion behavior unless context suggests otherwise.
 
 ## Combat
 
-Combat is different from normal companion movement.
+The human plays the human character normally.
 
-On its turn, the Pawn should independently:
+The Pawn independently plays the Pawn:
 
-1. read current state,
-2. inspect legitimate available actions,
-3. evaluate the situation through its Character Profile and current instruction,
-4. choose an action,
-5. let Foundry resolve mechanics,
-6. observe the new state,
-7. continue until finished,
-8. end turn.
+1. reads current permitted state,
+2. inspects legitimate actions,
+3. evaluates them through Character Profile/current instruction,
+4. acts through Cloudflare MCP as the AI Foundry user,
+5. Foundry resolves mechanics,
+6. AI observes the new state,
+7. continues or ends turn.
 
-The human should not have to select every Pawn action.
-
-## Human/world changes
-
-If the human manually changes the Pawn or the world changes while the AI has a pending plan, state freshness wins.
-
-Example:
-
-```text
-AI receives state 145
-human moves the Pawn
-world becomes state 146
-AI submits old action from state 145
-→ reject as stale
-→ refresh
-→ AI decides from state 146
-```
-
-This prevents the AI from fighting a human's current input.
+The human does not need to drive the Pawn's turn.
