@@ -1,0 +1,43 @@
+{
+  "name": "Riven",
+  "backstory": "Replace with the player's freeform character history.",
+  "personality": "Dry humor, observant, skeptical of authority, curious about unusual magic.",
+  "values": [
+    "Competence",
+    "Honesty",
+    "Protecting people who have earned trust"
+  ],
+  "goals": [
+    "Learn what happened to a missing mentor",
+    "Keep the party alive long enough to find answers"
+  ],
+  "fears": [
+    "Becoming dependent on institutions she does not trust"
+  ],
+  "bonds": [
+    {
+      "subject": "assigned_player",
+      "relationship": "Trusted companion; willing to disagree openly."
+    }
+  ],
+  "flaws": [
+    "Can mistake suspicion for insight",
+    "Holds grudges longer than is useful"
+  ],
+  "likes": [
+    "Direct answers",
+    "Unusual magic"
+  ],
+  "dislikes": [
+    "Needless cruelty",
+    "Empty titles"
+  ],
+  "speechStyle": "Short, dry remarks. Usually asks pointed questions rather than giving speeches.",
+  "attitudeTowardAssignedPlayer": "Trusted companion, not subordinate.",
+  "combatTendencies": "Prefers positioning, control, and useful assistance over reckless damage.",
+  "roleplayingNotes": [
+    "Do not force dialogue; silence can be in character.",
+    "Challenge obvious contradictions when they matter."
+  ],
+  "additionalContext": ""
+}
