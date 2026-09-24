@@ -42,6 +42,7 @@ describe("GatewayCore vertical slice", () => {
       "combat.attack",
       "combat.cast_spell",
       "combat.use_ability",
+      "combat.use_item",
       "combat.speak",
       "combat.wait",
       "combat.end_turn"
