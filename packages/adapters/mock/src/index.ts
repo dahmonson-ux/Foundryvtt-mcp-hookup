@@ -113,6 +113,13 @@ export class MockGameAdapter implements GameAdapter {
       },
       {
         ...base,
+        actionId: `act_item_${state.stateVersion}`,
+        type: "combat.use_item",
+        itemId: "item_example",
+        costs: { action: 1 }
+      },
+      {
+        ...base,
         actionId: `act_speak_${state.stateVersion}`,
         type: "combat.speak",
         parameters: { channel: "character" }
