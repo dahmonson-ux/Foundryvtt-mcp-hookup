@@ -112,6 +112,14 @@ The first milestone is one real Pawn that can:
 
 Once that works, generalize only what the working implementation proves necessary.
 
+## Current engineering phase
+
+**Phase 1 — Connection Spike is active.**
+
+The disposable probe lives in [spikes/phase1](spikes/phase1/README.md). It tests one player-browser/loopback candidate against the product acceptance test without promoting that candidate into the permanent architecture.
+
+The spike is successful only if one assigned Pawn can read its state and scene, receive visible conversation context, speak through Foundry, move through Foundry, and confirm the resulting state while remaining under the logged-in player's permissions.
+
 ## Connection strategy
 
 The transport is deliberately **not locked yet**.
