@@ -6,6 +6,7 @@ import type {
   AgentIdentity,
   CommandId,
   IdempotencyKey,
+  PawnRoleplayContext,
   VisibleState
 } from "@foundry-ai-gateway/contracts";
 import type {
@@ -35,6 +36,7 @@ export interface MockAdapterOptions {
   targetId?: string;
   stateVersion?: number;
   turnId?: string;
+  roleplay?: PawnRoleplayContext;
 }
 
 export class MockGameAdapter implements GameAdapter {
@@ -42,6 +44,7 @@ export class MockGameAdapter implements GameAdapter {
   private targetId: string;
   private stateVersion: number;
   private turnId: string;
+  private roleplay?: PawnRoleplayContext;
   private unknownNextExecution = false;
   private readonly reconciled = new Map<CommandId, AdapterReconciliationResult>();
 
@@ -52,6 +55,7 @@ export class MockGameAdapter implements GameAdapter {
     this.targetId = options.targetId ?? "entity_hostile_7";
     this.stateVersion = options.stateVersion ?? 1;
     this.turnId = options.turnId ?? "turn_1";
+    this.roleplay = options.roleplay ? structuredClone(options.roleplay) : undefined;
   }
 
   async readVisibleState(identity: AgentIdentity): Promise<VisibleState> {
@@ -62,7 +66,8 @@ export class MockGameAdapter implements GameAdapter {
       data: {
         self: { actorId: identity.actorId },
         visibleHostiles: [{ entityId: this.targetId }]
-      }
+      },
+      roleplay: this.roleplay ? structuredClone(this.roleplay) : undefined
     };
   }
 
