@@ -55,6 +55,40 @@ describe("GatewayCore vertical slice", () => {
     }
   });
 
+  it("returns role-playing context without interpreting the character", async () => {
+    const adapter = new MockGameAdapter({
+      roleplay: {
+        characterProfile: {
+          name: "Riven",
+          personality: "Dry humor and skeptical of authority."
+        },
+        currentInstruction: {
+          text: "Stay with the party."
+        },
+        assignedPlayerActorId: "actor_player"
+      }
+    });
+    const gateway = new GatewayCore({
+      identityProvider: new StaticIdentityProvider([identity()]),
+      adapter,
+      resolver: new DefaultAffordanceResolver(),
+      ledger: new InMemoryActionLedger()
+    });
+
+    const available = await gateway.getAvailableActions("agent_x");
+
+    expect(available.state.roleplay).toEqual({
+      characterProfile: {
+        name: "Riven",
+        personality: "Dry humor and skeptical of authority."
+      },
+      currentInstruction: {
+        text: "Stay with the party."
+      },
+      assignedPlayerActorId: "actor_player"
+    });
+  });
+
   it("executes an offered action and suppresses an exact duplicate", async () => {
     const { gateway, adapter, ledger } = createHarness();
     const available = await gateway.getAvailableActions("agent_x");
