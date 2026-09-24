@@ -42,6 +42,7 @@ describe("GatewayCore vertical slice", () => {
       "combat.attack",
       "combat.cast_spell",
       "combat.use_ability",
+      "combat.use_item",
       "combat.speak",
       "combat.wait",
       "combat.end_turn"
@@ -52,6 +53,40 @@ describe("GatewayCore vertical slice", () => {
       expect(action.expiresAtStateVersion).toBe(1);
       expect(action.actorId).toBe("actor_pawn");
     }
+  });
+
+  it("returns role-playing context without interpreting the character", async () => {
+    const adapter = new MockGameAdapter({
+      roleplay: {
+        characterProfile: {
+          name: "Riven",
+          personality: "Dry humor and skeptical of authority."
+        },
+        currentInstruction: {
+          text: "Stay with the party."
+        },
+        assignedPlayerActorId: "actor_player"
+      }
+    });
+    const gateway = new GatewayCore({
+      identityProvider: new StaticIdentityProvider([identity()]),
+      adapter,
+      resolver: new DefaultAffordanceResolver(),
+      ledger: new InMemoryActionLedger()
+    });
+
+    const available = await gateway.getAvailableActions("agent_x");
+
+    expect(available.state.roleplay).toEqual({
+      characterProfile: {
+        name: "Riven",
+        personality: "Dry humor and skeptical of authority."
+      },
+      currentInstruction: {
+        text: "Stay with the party."
+      },
+      assignedPlayerActorId: "actor_player"
+    });
   });
 
   it("executes an offered action and suppresses an exact duplicate", async () => {

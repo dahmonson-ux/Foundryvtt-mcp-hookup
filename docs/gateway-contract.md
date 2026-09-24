@@ -1,6 +1,8 @@
 # Gateway Contract
 
-The public gateway stays small and provider-neutral. Gameplay actions are data returned by the affordance resolver, not individual public endpoints.
+The gateway is a small reliability and scope boundary around a Pawn's legitimate game actions.
+
+It is not the role-playing engine. The AI and Character Profile determine how the character chooses among legitimate options.
 
 ## Operations
 
@@ -11,80 +13,62 @@ proposeAction(agentId, proposal, stateVersion, idempotencyKey)
 reconcileAction(commandId, idempotencyKey)
 ```
 
-Transport adapters may expose these over REST, MCP, WebSocket RPC, or another protocol, but they must call the same core implementation.
+A transport may expose these through MCP, REST, RPC, or another protocol.
 
 ## getAvailableActions
 
-Returns a filtered snapshot plus ephemeral action affordances valid for a specific state version.
+Returns:
 
-Example:
+- current visible state,
+- optional role-playing context,
+- current state version,
+- legitimate ephemeral actions.
 
-```json
-{
-  "state_version": 733,
-  "turn_id": "turn_204",
-  "actions": [
-    {
-      "action_id": "act_01",
-      "contract_version": 1,
-      "type": "combat.attack",
-      "actor_id": "actor_pawn",
-      "target_id": "entity_hostile_7",
-      "ability_id": "ability_longsword",
-      "costs": { "action": 1 },
-      "state_version": 733,
-      "expires_at_state_version": 733,
-      "approval": { "required": false }
-    }
-  ]
-}
-```
+Action IDs are state-bound.
 
 ## executeAction
 
-Executes only an action previously offered to this agent for the supplied state version.
+Executes only an action previously offered to this agent.
 
 Validation includes:
 
-- authenticated agent identity
-- actor ownership/scope
-- capability policy
-- visibility constraints
-- state version
-- turn identity when applicable
-- action expiry
-- idempotency key
-- authoritative legality at execution time
+- resolved agent identity,
+- Actor scope,
+- capability policy,
+- state version,
+- turn identity when applicable,
+- action expiry,
+- idempotency,
+- authoritative legality at execution time.
 
-The gateway does not choose a replacement action.
+The gateway does not silently replace the AI's chosen action with another strategy.
 
 ## proposeAction
 
-Used for actions that cannot be represented by a currently offered affordance or that enter an approval/policy path.
+Used when the AI wants to attempt something not represented by a current affordance.
 
-Typical uses:
+Typical examples:
 
-- improvised actions
-- open-ended world tasks
-- table-policy approval
-- a client that only supports structured command mode
+- improvised action,
+- open-ended supported world task,
+- table-policy approval path.
 
-A proposal must resolve against the same underlying legality engine used by affordance generation. It must not create a second game-rules implementation.
+A proposal must resolve through the same Foundry/game-system authority. It does not create a second rules engine.
 
 ## reconcileAction
 
-Used when execution status is `UNKNOWN` or a client reconnects without a reliable final result.
+Used when execution may have happened but the caller did not receive a definitive result.
 
-Reconciliation uses:
+Never blindly repeat a consequential action to resolve uncertainty.
 
-- command ID
-- idempotency key
-- ledger evidence
-- adapter execution receipt when available
-- authoritative state observation
+## Role-playing context
 
-Never blindly replay a non-idempotent action to resolve uncertainty.
+`VisibleState.roleplay` may carry:
 
-## Transport authentication
+- Character Profile,
+- assigned player Actor,
+- current player instruction,
+- relevant conversation context,
+- compact memory summary.
 
-The four operations are core game operations, not an authentication protocol. REST/MCP/WebSocket adapters must authenticate callers before invoking them and must not trust a caller-supplied agent ID by itself.
+This context informs AI choice. The gateway does not interpret personality or decide dialogue/tactics.

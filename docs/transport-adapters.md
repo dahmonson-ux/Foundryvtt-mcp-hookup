@@ -1,20 +1,30 @@
 # Transport Adapters
 
-REST, MCP, WebSocket, and future transports should stay thin over the same gateway core.
+The project does not commit to a production remote-player transport until the Phase 1 connection spike.
+
+Transport is an implementation detail beneath the Pawn Functional Contract.
 
 ## Rule
 
-Transport code must not implement game strategy or a separate legality engine.
+Transport code should be thin.
 
 ```text
-REST ---------\
-MCP -----------+--> GatewayCore --> Resolver --> Foundry adapter
-WebSocket ----/
+AI / MCP / client
+      ↓
+GatewayCore
+      ↓
+FoundryGameAdapter
+      ↓
+chosen connection implementation
+      ↓
+Foundry
 ```
+
+Do not put game strategy or a second legality engine into transport code.
 
 ## MCP
 
-Expose the same four gateway operations:
+A model-facing MCP adapter should expose a small stable surface such as:
 
 ```text
 get_available_actions
@@ -23,103 +33,44 @@ propose_action
 reconcile_action
 ```
 
-Do not generate one MCP tool per spell, weapon, maneuver, or world action.
+The AI receives structured state/actions and chooses an action ID.
 
-The model receives structured affordances and selects an `action_id`.
+Do not create one MCP tool per weapon, spell, or item.
 
-## REST
+## REST / RPC / WebSocket
 
-A custom REST adapter can map the core operations to a small surface such as:
+A connection implementation may use REST, RPC, WebSocket, a Foundry module, or another mechanism when appropriate.
 
-```text
-GET  /v1/agents/:agentId/actions
-POST /v1/actions/:actionId/execute
-POST /v1/actions/propose
-POST /v1/actions/:commandId/reconcile
-```
+Regardless of technology, it must preserve:
 
-For custom remote deployments, authenticate the caller before invoking `GatewayCore`.
+- Actor binding,
+- player-level permissions,
+- visible-state filtering,
+- action freshness,
+- execution results,
+- uncertain-outcome reconciliation.
 
-## Remote-player mode is different
+## Phase 1 connection spike
 
-The preferred remote-player architecture does **not** expose the local MCP server to the internet.
+Evaluate candidate transports using:
 
-The player is already connected to the remote Foundry world through their browser.
+### Simplicity
 
-```text
-AI
-  -> local MCP
-  -> PlayerClientBridge
-  -> local PlayerClientTransport
-  -> player-side Foundry module
-  -> authenticated browser session
-  -> remote Foundry server
-```
+- How many components must the player run?
+- How much configuration is required?
+- Does it reuse access the player already has?
 
-The internet-facing Foundry connection belongs to the browser, not the MCP server.
+### Reliability
 
-## PlayerClientTransport
+- Can it reconnect cleanly?
+- Can it detect stale state?
+- Can it distinguish failed vs unknown execution?
+- Does it preserve player permissions?
 
-`PlayerClientTransport` is the local companion transport between:
+### Role-playing quality
 
-- the local MCP/Pawn runner,
-- the player-side Foundry module running in the browser.
+- Can it receive conversation/state updates promptly?
+- Is latency low enough for natural table interaction?
+- Can it provide the context needed for a Pawn to feel present?
 
-It must remain local-only.
-
-The exact technology is intentionally not fixed yet. It may be a localhost WebSocket or another browser-compatible IPC mechanism.
-
-Requirements:
-
-- bind only to loopback,
-- use an explicit pairing handshake,
-- do not expose a public listener,
-- do not copy browser credentials into the runner,
-- carry only the bounded bridge message schema,
-- support reconnect/session replacement,
-- do not provide arbitrary JavaScript execution.
-
-## Browser-side operations
-
-The player-side Foundry module should implement:
-
-```text
-read_filtered_state
-list_legal_actions
-execute_action
-reconcile_action
-resolve_proposal
-```
-
-Those operations are internal to the bridge. The AI still sees the four gateway-level MCP operations.
-
-## WebSocket/event delivery
-
-WebSocket may still be useful for ordered local event delivery:
-
-- turn started
-- state changed
-- action result
-- actor changed
-- combat ended
-- approval requested/resolved
-
-Events should include sequence and state version.
-
-If a sequence gap cannot be recovered, request a fresh state snapshot.
-
-## Authentication and identity
-
-### Custom server mode
-
-A custom public transport must authenticate the caller and supply a verified identity to the gateway.
-
-### Player-client mode
-
-The Foundry user identity comes from the already-authenticated browser client.
-
-The local MCP identity is bound to `AI_ACTOR_UUID`.
-
-The player-side module must verify that the current Foundry user can control that Actor before servicing bridge operations.
-
-No Foundry password, API key, browser cookie, or session token should be exported to the MCP process.
+The winning transport is the one that best serves the product, not the most elaborate architecture.

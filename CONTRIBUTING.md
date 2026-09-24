@@ -2,17 +2,21 @@
 
 Contributions are welcome.
 
-## Principles
+## Product rule
 
-Changes should preserve these architectural boundaries:
+Every change should make the system simpler, more reliable, or improve the role-playing experience.
 
-1. The gateway owns the public game contract and policy enforcement.
-2. The affordance resolver describes currently available choices.
-3. The adapter owns Foundry and game-system-specific behavior.
-4. The ledger owns accountability and reconciliation records.
-5. Foundry remains authoritative for game state and mechanical execution.
+The project is building an AI player/Pawn first. Avoid expanding into Assistant DM/world-authoring work until the Pawn vertical slice is complete.
 
-Do not expand the public gateway with one endpoint per game action. Add new gameplay choices as affordance types and resolver behavior.
+## Boundaries
+
+1. The Pawn Functional Contract defines capabilities and context, not personality.
+2. Character Profile data informs AI choices without scripting them.
+3. Foundry remains authoritative for permissions and mechanics.
+4. The AI should choose from legitimate current actions.
+5. State-bound actions must fail safely when stale.
+6. Transport-specific details belong below the Foundry adapter boundary.
+7. Do not expose arbitrary JavaScript as a normal Pawn command.
 
 ## Development
 
@@ -21,16 +25,26 @@ npm install
 npm run check
 ```
 
-Please add tests for behavior changes, especially around visibility, staleness, duplicate suppression, reconnects, unknown execution outcomes, and hidden-information handling.
+Add tests for behavior changes, particularly:
 
-## Privacy
+- Actor scope,
+- stale actions,
+- duplicate suppression,
+- reconnect/UNKNOWN reconciliation,
+- permission failures,
+- conversation ordering/context,
+- player/world changes while the AI is planning.
 
-Use synthetic IDs and relative paths in examples and tests. Do not commit:
+## Examples and privacy
 
-- personal names or player-identifying details unless intentionally public
-- machine usernames
-- absolute filesystem paths
-- local IP addresses beyond documentation examples
-- credentials, tokens, tunnel URLs, or secrets
-- private prompts or chat logs
-- exported Foundry world data unless it is explicitly licensed and intended for publication
+Use synthetic identities and paths.
+
+Do not commit:
+
+- player-identifying data,
+- credentials/tokens,
+- session cookies,
+- private campaign exports,
+- absolute local paths,
+- private prompts/chat logs,
+- secrets or tunnel credentials.

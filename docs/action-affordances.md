@@ -1,210 +1,105 @@
 # Action Affordances
 
-Affordances are resolver output. They are not separate public gateway endpoints.
+Affordances are the legitimate game choices offered to the AI for the current state.
+
+The AI should choose among actions actually offered by Foundry/the adapter rather than inventing IDs, targets, coordinates, or mechanical outcomes.
 
 ## Common envelope
 
-Every action should carry, as applicable:
+An action may contain:
 
-- `action_id`: ephemeral identifier
-- `contract_version`
+- `actionId`
+- `contractVersion`
 - `type`
-- `actor_id`
-- `target_id`
-- `ability_id`
-- `item_id`
-- destination or path parameters
+- `actorId`
+- `targetId`
+- `abilityId`
+- `itemId`
+- destination/path parameters
 - costs
 - requirements
-- visibility/scope metadata
-- `state_version`
-- `turn_id`
-- `expires_at_state_version`
+- scope metadata
+- `stateVersion`
+- `turnId`
+- `expiresAtStateVersion`
 - optional approval metadata
-- canonical references for Assistant DM world mutations
 
-## Combat resolver families
+## First playable slice
 
-### Movement
+Prioritize these before the larger taxonomy.
 
-- `combat.move`
-- `combat.stand`
-- `combat.drop_prone`
-- `combat.jump`
-- `combat.climb`
-- `combat.swim`
-- `combat.crawl`
-- `combat.fly`
-- `combat.burrow`
-- `combat.mount`
-- `combat.dismount`
+### Exploration / social
 
-Movement, mounting, and dismounting consume movement resources as dictated by the game system. They are not automatically treated as normal Actions.
+```text
+world.follow
+world.move
+world.interact
+world.speak
+world.wait
+```
 
-### Standard tactical actions
+### Combat
 
-- `combat.dash`
-- `combat.disengage`
-- `combat.dodge`
-- `combat.help`
-- `combat.hide`
-- `combat.search`
-- `combat.study`
-- `combat.influence`
-- `combat.ready`
-- `combat.utilize`
-- `combat.interact`
+```text
+combat.move
+combat.attack
+combat.cast_spell
+combat.use_ability
+combat.use_item
+combat.speak
+combat.wait
+combat.end_turn
+```
 
-### Attacks and contested actions
+A connection implementation is not complete merely because these names exist. Each advertised action must have a tested Foundry-side execution path.
 
-- `combat.attack`
-- `combat.unarmed`
-- `combat.grapple`
-- `combat.shove`
-- `combat.escape_grapple`
-- `combat.release_grapple`
+## Expanded combat vocabulary
 
-`combat.grapple` and `combat.shove` are convenient affordance types. Their mechanical implementation should route through the applicable Unarmed Strike/activity mechanics of the game system.
+The repository may support additional combat affordances after the first slice:
 
-### Magic, features, and equipment
+- stand/drop prone
+- jump/climb/swim/crawl/fly
+- dash/disengage/dodge/help/hide
+- search/study/influence
+- ready/interact/utilize
+- unarmed/grapple/shove
+- equipment changes
+- whisper
+- reactions/conditional follow-up choices
 
-- `combat.cast_spell`
-- `combat.use_ability`
-- `combat.use_item`
-- `combat.equip`
-- `combat.unequip`
+## Expanded world vocabulary
 
-### Communication and autonomy
+Later exploration affordances may include:
 
-- `combat.speak`
-- `combat.whisper`
-- `combat.ask_human`
-- `combat.wait`
-- `combat.decline`
-- `combat.end_turn`
+- travel/navigation
+- scout/guard/observe/search/investigate/listen
+- tool use
+- inventory transfer/equipment
+- rest/watch
+- independent supported tasks
 
-### Catch-all
+The Pawn Functional Contract determines the product meaning. The transport should not create a separate semantic vocabulary.
 
-- `combat.improvise`
+## Consequences are not strategic actions
 
-Improvised actions enter the proposal/resolution path and are resolved by the table/game system rather than by inventing a second rules engine in the gateway.
+Normally, the AI chooses the intent while Foundry resolves:
 
-## Conditional combat resolver families
+- attack rolls,
+- damage rolls,
+- saving throws,
+- ability checks,
+- concentration checks,
+- healing/damage application,
+- conditions,
+- spell-slot consumption,
+- ammunition/item consumption,
+- initiative,
+- effect creation/expiry.
 
-Emit these only when their trigger or resource makes them legal:
+Do not expose those as strategic choices unless the installed game system actually requires a player choice.
 
-- `conditional.bonus_action`
-- `conditional.reaction`
-- `conditional.opportunity_attack`
-- `conditional.readied_reaction`
-- `conditional.feature_reaction`
-- `conditional.extra_attack`
-- `conditional.offhand_attack`
-- `conditional.weapon_mastery_choice`
-- `conditional.cast_reaction_spell`
-- `conditional.use_reaction_ability`
-- `conditional.decline_reaction`
-- `conditional.teleport`
-- `conditional.summon`
-- `conditional.transform`
-- `conditional.heal`
-- `conditional.select_target`
-- `conditional.select_area`
-- `conditional.select_spell_level`
-- `conditional.select_damage_type`
-- `conditional.select_mode`
+## Improvised actions
 
-Selection affordances are useful when an action requires a second structured choice.
+An unsupported action may use the proposal path.
 
-## World resolver families
-
-### Movement, travel, and navigation
-
-- `world.move`
-- `world.follow`
-- `world.stop`
-- `world.jump`
-- `world.climb`
-- `world.swim`
-- `world.crawl`
-- `world.fly`
-- `world.mount`
-- `world.dismount`
-- `world.travel`
-- `world.follow_route`
-- `world.navigate`
-- `world.scout`
-- `world.guard`
-
-### Perception and investigation
-
-- `world.observe`
-- `world.search`
-- `world.study`
-- `world.investigate`
-- `world.listen`
-- `world.hide`
-
-### Interaction, tools, and inventory
-
-- `world.interact`
-- `world.utilize`
-- `world.use_tool`
-- `world.pickup`
-- `world.drop`
-- `world.transfer_item`
-- `world.equip`
-- `world.unequip`
-- `world.attune`
-- `world.unattune`
-- `world.use_item`
-
-### Abilities and magic
-
-- `world.cast_spell`
-- `world.use_ability`
-- `world.help`
-
-### Social
-
-- `world.influence`
-- `world.speak`
-- `world.ask_question`
-- `world.answer`
-- `world.whisper`
-- `world.ask_human`
-
-### Rest and ongoing activity
-
-- `world.rest_short`
-- `world.rest_long`
-- `world.take_watch`
-- `world.wait`
-- `world.decline`
-- `world.stop_activity`
-
-### Catch-all
-
-- `world.attempt_task`
-
-This represents an open-ended task that the game system or GM resolves without adding a bespoke gateway endpoint.
-
-## Consequences are not strategic affordances
-
-The following are normally results of an action rather than choices:
-
-- attack rolls
-- damage rolls
-- saving throws
-- concentration checks
-- death saves
-- ability checks requested by the rules
-- damage or healing application
-- condition application/removal
-- spell-slot consumption
-- ammunition or item consumption
-- feature-charge consumption
-- initiative rolls
-- effect creation/expiry
-
-The agent chooses the intent. Foundry and the game-system adapter resolve the mechanics.
+A proposal should be resolved by Foundry/game-system/GM logic rather than by inventing a second rules engine in the gateway.

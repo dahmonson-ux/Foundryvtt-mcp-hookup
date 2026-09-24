@@ -1,121 +1,66 @@
 # Configuration and Secrets
 
-This repository intentionally keeps credentials, browser sessions, machine paths, and private player data out of source control.
+Configuration should remain minimal until a concrete connection implementation proves it needs additional values.
 
-The important distinction is that **remote-player shared-controller mode does not copy Foundry authentication into the local MCP/Pawn runner**.
+## Current reference settings
 
-## Solo / local mode
-
-A custom local gateway/server may use:
+The example environment contains:
 
 ```text
 GATEWAY_HOST
 GATEWAY_PORT
 GATEWAY_LOG_LEVEL
 GATEWAY_AUTH_SECRET
+AI_ACTOR_UUID
 FOUNDRY_BASE_URL
 FOUNDRY_BRIDGE_SECRET
 ```
 
-Only provide values actually required by your local bridge/server implementation.
+Not every deployment needs every setting.
 
-`GATEWAY_AUTH_SECRET` is required by the reference `loadGatewayConfig()` loader.
+## Actor assignment
 
-## Remote-player shared-controller mode
+`AI_ACTOR_UUID` identifies the Pawn Actor for a runtime that chooses to configure Actor assignment through environment variables.
 
-The player is already authenticated to the remote Foundry world in their browser.
+Actor assignment does not grant permission.
 
-The local AI bridge should **not** require:
+The chosen Foundry connection must still enforce player/Actor authority.
 
-```text
-Foundry password
-Foundry API key
-browser cookie
-session token
-GM credential
-remote relay token
-```
+## Transport-specific configuration
 
-Authentication remains in the browser.
+The production remote-player transport is intentionally undecided.
 
-The player-specific bridge configuration is:
+Do not add speculative credential/tunnel/session configuration to the public template.
 
-```text
-AI_ACTOR_UUID=Actor.<pawn>
-```
+Add transport-specific values only after the connection spike proves they are required.
 
-The planned local companion endpoint is:
+## Never commit
 
-```text
-PLAYER_CLIENT_BRIDGE_HOST=127.0.0.1
-PLAYER_CLIENT_BRIDGE_PORT=3001
-```
+- passwords,
+- API keys,
+- bearer tokens,
+- browser cookies/session tokens,
+- tunnel credentials,
+- private signing keys,
+- temporary pairing credentials,
+- personal player data,
+- private prompts/chat logs,
+- absolute local paths,
+- private campaign exports.
 
-Those host/port values describe the future local transport. The current `PlayerClientBridge` code is transport-agnostic.
+## Character Profile data
 
-## Local pairing
+Character Profiles may contain private player-authored material.
 
-The browser-side Foundry module and local MCP/Pawn runner should use an explicit local pairing handshake.
+A deployment should decide whether profiles are:
 
-If the transport requires a temporary pairing secret, generate it at runtime rather than committing it to the repository.
+- local files,
+- Foundry data,
+- application data,
+- ephemeral session input.
 
-Do not reuse the Foundry browser session credential as the pairing credential.
-
-## Local setup
-
-Copy:
-
-```bash
-cp .env.example .env
-```
-
-PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Then replace only the values needed for your deployment.
-
-Do not commit `.env`.
-
-## What should never be committed
-
-- passwords
-- API keys
-- bearer tokens
-- browser cookies
-- Foundry session tokens
-- tunnel credentials
-- private signing keys
-- personally identifying player data
-- private prompts or logs
-- local usernames
-- absolute filesystem paths
-- private Foundry world paths
-- temporary player-client pairing tokens
-
-## Agent credentials
-
-Custom server transports may use per-agent credentials:
-
-```text
-AGENT_X_API_KEY=INSERT_AGENT_X_API_KEY_HERE
-AGENT_Y_API_KEY=INSERT_AGENT_Y_API_KEY_HERE
-```
-
-Those are optional transport-owned values.
-
-They are **not** required for the preferred remote-player shared-controller path because the browser session already establishes the Foundry user and `AI_ACTOR_UUID` binds the AI to one controllable Actor.
+Do not silently publish profile/backstory content.
 
 ## Placeholder behavior
 
-The reference config loaders reject required values that still begin with `INSERT_`.
-
-That prevents example placeholders from accidentally becoming deployment credentials.
-
-## Production secrets
-
-Where secrets are required, prefer process environment injection or a secret manager over plaintext files.
-
-The player-client bridge should avoid needing Foundry secrets at all.
+Reference loaders may reject required values that still begin with `INSERT_` so examples cannot accidentally become live credentials.

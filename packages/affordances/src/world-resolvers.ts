@@ -50,3 +50,12 @@ export const WORLD_AFFORDANCE_TYPES = [
 ] as const;
 
 export type WorldAffordanceType = (typeof WORLD_AFFORDANCE_TYPES)[number];
+
+
+export const FIRST_SLICE_WORLD_TYPES: readonly WorldAffordanceType[] = [
+  "world.follow",
+  "world.move",
+  "world.interact",
+  "world.speak",
+  "world.wait"
+];
