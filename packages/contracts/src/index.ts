@@ -26,6 +26,50 @@ export interface CapabilityRule {
   requiresApproval?: boolean;
 }
 
+export interface CharacterBond {
+  subject: string;
+  relationship: string;
+}
+
+export interface CharacterProfile {
+  name?: string;
+  backstory?: string;
+  personality?: string;
+  values?: string[];
+  goals?: string[];
+  fears?: string[];
+  bonds?: CharacterBond[];
+  flaws?: string[];
+  likes?: string[];
+  dislikes?: string[];
+  speechStyle?: string;
+  attitudeTowardAssignedPlayer?: string;
+  combatTendencies?: string;
+  roleplayingNotes?: string[];
+  additionalContext?: string;
+}
+
+export interface PlayerInstruction {
+  text: string;
+  issuedAt?: string;
+  expiresAt?: string;
+}
+
+export interface PawnRoleplayContext {
+  characterProfile?: CharacterProfile;
+  currentInstruction?: PlayerInstruction;
+  assignedPlayerActorId?: ActorId;
+  conversation?: {
+    participants?: string[];
+    recentMessages?: Array<{
+      speakerId?: string;
+      speakerName?: string;
+      text: string;
+    }>;
+  };
+  memorySummary?: string;
+}
+
 export interface AgentIdentity {
   agentId: AgentId;
   actorId: ActorId;
@@ -38,6 +82,7 @@ export interface VisibleState {
   turnId?: TurnId;
   mode: GameMode;
   data: Record<string, unknown>;
+  roleplay?: PawnRoleplayContext;
 }
 
 export interface ActionCost {
@@ -52,27 +97,6 @@ export interface ApprovalMetadata {
   required: boolean;
   reason?: string;
   policyId?: string;
-}
-
-export type CanonicalSourceType =
-  | "gm_directive"
-  | "campaign_document"
-  | "foundry_document"
-  | "compendium"
-  | "system_rule"
-  | "module_definition"
-  | "asset"
-  | "other";
-
-export interface CanonicalReference {
-  referenceId: string;
-  sourceType: CanonicalSourceType;
-  sourceId: string;
-  locator?: string;
-  version?: string;
-  contentHash?: string;
-  authority?: string;
-  canonical: true;
 }
 
 export interface ActionAffordance {
@@ -92,11 +116,6 @@ export interface ActionAffordance {
   turnId?: TurnId;
   expiresAtStateVersion: StateVersion;
   approval?: ApprovalMetadata;
-  /**
-   * Required for DM world-mutating affordances. References are produced by
-   * trusted resolver/reference code, not invented by the client.
-   */
-  references?: CanonicalReference[];
 }
 
 export interface AvailableActionsResponse {
@@ -113,7 +132,6 @@ export interface ActionProposal {
   type: string;
   parameters?: Record<string, unknown>;
   rationale?: StructuredRationale;
-  references?: CanonicalReference[];
 }
 
 export interface ActionSelection {
@@ -200,6 +218,5 @@ export interface LedgerRecord {
   resultId?: string;
   correlationId?: string;
   causationId?: string;
-  referenceIds?: string[];
   metadata?: Record<string, unknown>;
 }
