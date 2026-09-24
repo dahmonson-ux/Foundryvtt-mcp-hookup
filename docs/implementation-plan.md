@@ -1,156 +1,147 @@
 # Implementation Plan
 
-Build vertically. Each phase should end with something demonstrably playable.
+Build vertically around the two-player model.
 
-## Phase 0 — Freeze the product contract
+## Phase 0 — Product contract
 
-Deliver:
+Complete.
 
-- `PRODUCT.md`
-- Pawn Functional Contract
-- Character Profile schema
-- exploration/conversation rules
-- initial command vocabulary
-- Version 1 non-goals
+The product now assumes:
 
-Exit criterion: another engineer can explain what the Pawn is supposed to do without inventing a universal personality policy.
+- separate human and AI Foundry identities,
+- separate access routes,
+- separate Actor ownership,
+- shared world/context,
+- role-playing relationship rather than shared control.
 
-## Phase 1 — Connection spike
+## Phase 1 — Dual-route connection validation
 
-Goal: prove the smallest real player-level connection that can operate one Pawn.
+### Human route
 
-Test practical connection options available in the target deployment. Do not commit to a large networking architecture before this spike.
+Prove the human can:
 
-The winning path should best satisfy:
+- connect through the intended human/player API access path,
+- play their own Actor normally,
+- remain independent of the AI gateway.
 
-1. simplicity,
-2. reliability,
-3. role-playing responsiveness.
+### AI route
 
-Minimum proof:
+Prove the AI can:
 
-```text
-identify one Pawn
-read Actor state
-read relevant scene state
-speak
-move
-```
+- connect through Cloudflare MCP,
+- authenticate as the dedicated AI Foundry user,
+- identify the assigned Pawn,
+- read permitted Actor/scene state,
+- receive relevant visible conversation,
+- speak as the Pawn,
+- move the Pawn,
+- observe the resulting state,
+- fail cleanly when attempting an unowned human Actor.
 
-Exit criterion: one test Pawn can perceive, speak, and move through legitimate Foundry functionality.
+Exit criterion: one human and one AI Pawn can be connected simultaneously and independently in the same world.
 
 ## Phase 2 — Social + movement slice
 
 Add:
 
-- assigned-player association,
+- associated-human relationship/context,
 - accompany/follow behavior,
 - relevant conversation context,
 - Pawn speech,
 - explicit player instruction.
 
-Exit criterion: in a town scene the player can walk to an NPC, start a conversation, and the Pawn can naturally remain with the player and participate.
+Exit criterion: the human walks to an NPC through the human route while the Pawn independently accompanies them and can participate through the AI route.
 
 ## Phase 3 — Combat slice
 
-Add:
+Add to the AI route:
 
 - combat detection,
 - own-turn detection,
 - legal action retrieval,
 - movement,
 - targeting,
-- one weapon attack path,
-- one spell/ability path,
-- one item-use path,
+- weapon attack,
+- spell/ability path,
+- item use,
 - result observation,
 - end turn.
 
-Exit criterion: the Pawn can complete a full combat turn without the human choosing each action.
+Exit criterion: the human plays their own turns normally and the Pawn independently completes its own turn.
 
 ## Phase 4 — Character role layer
 
-Add Character Profile loading and provide it to the AI alongside live state.
+Load Character Profile with live state.
 
-Test at least two substantially different profiles against the same scenarios.
+Test multiple profiles against the same scene.
 
-Exit criterion: the same mechanics produce meaningfully different, plausible role-playing choices without changing infrastructure code.
+Exit criterion: different profiles produce meaningfully different plausible role-playing choices without infrastructure changes.
 
 ## Phase 5 — Instruction + continuity
 
 Add:
 
-- current player instruction,
+- player-to-Pawn current instruction,
 - temporary independent tasks,
 - return-to-companion behavior,
-- useful character/campaign memory.
+- character/campaign memory.
 
-Exit criterion: the Pawn can follow a temporary task, remain in character, and resume normal party participation.
+Exit criterion: the Pawn can follow a temporary instruction while remaining an independent AI player.
 
 ## Phase 6 — Reliability hardening
 
-Add/test:
+Test:
 
+- Cloudflare MCP reconnect,
+- AI Foundry session reconnect,
 - stale-state recovery,
-- reconnect handling,
 - duplicate suppression,
-- uncertain execution reconciliation,
-- permission failures,
-- unavailable Actor/token,
-- rapid conversation updates,
-- human changes during AI planning.
-
-Exit criterion: ordinary failures do not cause duplicate or out-of-scope actions.
+- unknown execution reconciliation,
+- permission changes,
+- unowned-Actor attempts,
+- rapid conversation updates.
 
 ## Phase 7 — Player setup
 
-Target flow:
+Target table setup:
 
 ```text
-1. install/start companion component
-2. connect to Foundry through the supported player path
-3. choose Pawn Actor
-4. add/select Character Profile
-5. connect preferred AI/model
-6. play
+HUMAN
+1. create/connect human Foundry account
+2. assign Human Actor
+3. open human player session
+
+AI PAWN
+1. create AI Foundry account
+2. assign Pawn Actor
+3. configure Character Profile
+4. connect AI through Cloudflare MCP
+5. start AI player
 ```
 
-Exit criterion: a new player can set up from documentation without developer assistance.
+Exit criterion: a table can add a human + AI Pawn pair from documentation without developer assistance.
 
-## Phase 8 — Generalize only proven needs
+## Phase 8 — Generalize proven needs
 
-Only after the vertical slice works:
+Only after one pair works:
 
-- abstract transport differences,
-- add additional actions,
-- support additional game systems,
-- support multiple remote players,
-- improve packaging.
-
-Do not generalize guessed requirements.
+- multiple human/AI pairs,
+- additional actions,
+- additional game systems,
+- packaging/automation.
 
 ## First end-to-end demo
 
-### Town
-
 ```text
-Human walks to inn
-→ Pawn accompanies human
-NPC greets party
-→ Pawn receives conversation
-→ Pawn responds or stays quiet according to character/context
+HUMAN WINDOW                         AI ROUTE
+Human walks into inn                Pawn sees party context
+Human talks to NPC                  Pawn receives dialogue
+                                    Pawn decides whether to speak
+                                    Pawn speaks through AI account
+
+Combat begins
+Human plays Human Actor             AI waits for Pawn turn
+                                    AI reads legal actions
+                                    AI acts through Cloudflare MCP
+Foundry resolves both players normally
 ```
-
-### Combat
-
-```text
-combat begins
-→ Pawn detects turn
-→ reads legal state/actions
-→ chooses as its character
-→ Foundry executes mechanics
-→ Pawn observes result
-→ Pawn ends turn
-```
-
-That is the first product milestone.
