@@ -1,50 +1,40 @@
 # Failure Matrix
 
-The first vertical slice is not complete until these behaviors are executable tests.
+Reliability is a product requirement.
 
 | Scenario | Expected behavior |
 |---|---|
-| Disconnect after `turn.started` | Client resumes from sequence or requests snapshot |
-| Missed event | Sequence gap detected; no guessing from partial history |
-| Human changes state before AI acts | Old affordance rejected as stale |
+| Human/world changes state before AI acts | Old action rejected as stale; AI refreshes |
 | Same idempotency key retried | Original result returned; no duplicate action |
-| Same key reused for different action | Request rejected |
-| Human and AI act concurrently | Authoritative state/version determines winner; stale command rejected |
-| Foundry timeout before submission | Known failure; safe retry policy applies |
-| Foundry timeout after submission | Mark `UNKNOWN`; reconcile before retry |
-| Hidden target guessed by client | Generic invalid/unauthorized response without hidden detail |
-| Agent attempts another actor's action | Scope rejection |
-| Expired action ID | Stale/expired response and refreshed affordances |
-| Reaction trigger disappears | Reaction affordance expires |
-| Client reconnects with old sequence | Resume if retained; otherwise snapshot |
-| Ledger storage unavailable | Execution policy explicitly decides fail-open vs fail-closed; never silently lose accountability |
-| Adapter returns malformed result | Gateway fails safely and records adapter error |
+| Same key reused for different request | Reject |
+| AI attempts another Actor's action | Reject scope |
+| Expired action ID | Reject and refresh |
+| Connection drops before submission | Known failure; safe retry allowed |
+| Connection drops after possible execution | Mark UNKNOWN; reconcile before retry |
+| Target/action disappears | Reject stale/invalid action; refresh |
+| Actor/token temporarily unavailable | Fail clearly; no guessed substitute |
+| Permission changes | Reject and refresh identity/capabilities |
+| Human manually changes Pawn | Pending stale AI action must not override it |
+| Rapid conversation updates | Preserve order or refresh context |
+| Duplicate command arrives | Suppress duplicate execution |
+| Adapter returns malformed result | Fail safely and record adapter error |
+| Ledger unavailable | Follow explicit deployment policy; do not silently claim accountability |
+| Character Profile missing | Pawn mechanics still work; role-playing context is reduced, not invented |
 
-## Required first vertical slice
+## First vertical slice reliability
+
+The first playable slice should prove:
 
 ```text
-authenticate
- -> resolve identity/capabilities
- -> filtered snapshot
- -> turn event
- -> disconnect/reconnect
- -> refresh state
- -> choose legal affordance
- -> validate
- -> execute
- -> result or UNKNOWN
- -> reconcile
- -> event
- -> ledger
- -> refresh affordances
+resolve identity
+→ read visible state
+→ offer legal actions
+→ choose
+→ validate freshness/scope
+→ execute
+→ receive result or UNKNOWN
+→ reconcile if needed
+→ refresh state/actions
 ```
 
-Initial implemented affordances:
-
-- `combat.move`
-- `combat.attack`
-- `combat.cast_spell`
-- `combat.use_ability`
-- `combat.speak`
-- `combat.wait`
-- `combat.end_turn`
+Test this flow before adding broad action coverage.
