@@ -1,30 +1,48 @@
 # Transport Adapters
 
-The project does not commit to a production remote-player transport until the Phase 1 connection spike.
+The access model is now explicit:
 
-Transport is an implementation detail beneath the Pawn Functional Contract.
+- humans use the normal human/player API route,
+- AI Pawns use the Cloudflare MCP route,
+- both authenticate as separate Foundry users.
 
-## Rule
+## Human route
 
-Transport code should be thin.
+The human route is not part of the AI transport stack.
 
 ```text
-AI / MCP / client
-      ↓
-GatewayCore
-      ↓
-FoundryGameAdapter
-      ↓
-chosen connection implementation
-      ↓
-Foundry
+Human player
+→ human/player API access
+→ Human Foundry account
+→ Human Actor
 ```
 
-Do not put game strategy or a second legality engine into transport code.
+Human play should continue normally even if the AI gateway is offline.
 
-## MCP
+## AI route
 
-A model-facing MCP adapter should expose a small stable surface such as:
+```text
+AI
+→ GatewayCore
+→ FoundryGameAdapter
+→ Cloudflare MCP
+→ AI Foundry account
+→ Pawn Actor
+```
+
+The Cloudflare MCP layer should remain transport/thin-integration infrastructure.
+
+Do not place:
+
+- character personality logic,
+- tactical decision making,
+- a second game-rules engine,
+
+inside the transport.
+
+## AI-facing command surface
+
+The stable model-facing surface can remain small:
 
 ```text
 get_available_actions
@@ -33,44 +51,34 @@ propose_action
 reconcile_action
 ```
 
-The AI receives structured state/actions and chooses an action ID.
+The AI chooses from structured legal options.
 
-Do not create one MCP tool per weapon, spell, or item.
+Do not create one MCP command per weapon, spell, or item unless the actual MCP interface requires it.
 
-## REST / RPC / WebSocket
+## Required properties
 
-A connection implementation may use REST, RPC, WebSocket, a Foundry module, or another mechanism when appropriate.
+The AI transport must preserve:
 
-Regardless of technology, it must preserve:
-
-- Actor binding,
-- player-level permissions,
+- dedicated AI-user identity,
+- Pawn Actor binding,
+- Foundry permissions,
 - visible-state filtering,
-- action freshness,
+- state freshness,
 - execution results,
 - uncertain-outcome reconciliation.
 
-## Phase 1 connection spike
+## Phase 1
 
-Evaluate candidate transports using:
+Phase 1 no longer compares generic transports.
 
-### Simplicity
+It validates the real selected access model:
 
-- How many components must the player run?
-- How much configuration is required?
-- Does it reuse access the player already has?
+```text
+Human → human access → Human user → Human Actor
 
-### Reliability
+AI → Cloudflare MCP → AI user → Pawn
+```
 
-- Can it reconnect cleanly?
-- Can it detect stale state?
-- Can it distinguish failed vs unknown execution?
-- Does it preserve player permissions?
+The key test is not whether Cloudflare MCP can reach Foundry in general.
 
-### Role-playing quality
-
-- Can it receive conversation/state updates promptly?
-- Is latency low enough for natural table interaction?
-- Can it provide the context needed for a Pawn to feel present?
-
-The winning transport is the one that best serves the product, not the most elaborate architecture.
+The key test is whether the AI can behave as a legitimate separate player while Foundry continues to enforce account and Actor boundaries.
