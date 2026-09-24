@@ -48,6 +48,7 @@ export const FIRST_SLICE_COMBAT_TYPES: readonly CombatAffordanceType[] = [
   "combat.attack",
   "combat.cast_spell",
   "combat.use_ability",
+  "combat.use_item",
   "combat.speak",
   "combat.wait",
   "combat.end_turn"
