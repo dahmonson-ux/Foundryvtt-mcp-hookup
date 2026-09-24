@@ -2,90 +2,104 @@
 
 ## North Star
 
-Build an AI companion that legitimately plays a character in Foundry VTT alongside a human player.
+Build an AI companion that legitimately plays a character in Foundry VTT alongside human players.
 
-Every technical decision should make the system **simpler**, **more reliable**, or **improve the role-playing experience**. If it does none of those, it should not be in the first version.
+Every technical decision should make the system **simpler**, **more reliable**, or **improve the role-playing experience**.
 
-The target experience is:
+## Player model
+
+Humans and AI are separate Foundry players.
 
 ```text
-Human plays their character.
-
-AI Pawn accompanies them,
-participates in the adventure,
-joins conversations,
-and independently plays its own turns in combat.
+                         FOUNDRY WORLD
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+        HUMAN PLAYER ROUTE               AI PLAYER ROUTE
+              │                               │
+      Human API/access                  Cloudflare MCP
+              │                               │
+    Human Foundry account              AI Foundry account
+              │                               │
+       Human Actor                         Pawn Actor
 ```
+
+The routes share the world, not control.
+
+A human player does not lend their Foundry session to the AI.
+
+An AI Pawn uses its own Foundry player account and owns its own Actor.
 
 ## End goals
 
-1. One AI-controlled Pawn can be assigned to a human player.
-2. The human controls their normal character while the AI controls its own Pawn.
-3. Remote players can use the system when Foundry is hosted elsewhere.
-4. Reuse legitimate player-level access instead of creating unnecessary parallel control planes.
-5. The AI controls only its assigned Pawn unless explicitly reassigned.
-6. Foundry remains authoritative for permissions, legal mechanics, rolls, resources, targeting, movement, and outcomes.
-7. The AI receives enough player-visible state to make informed decisions.
-8. The AI uses bounded, legitimate game actions rather than unrestricted Foundry or JavaScript access.
-9. Outside combat, the Pawn accompanies its assigned player by default.
-10. When the player enters a conversation, the Pawn receives that conversation as shared context and may participate naturally.
-11. Explicit player instructions can temporarily change normal companion behavior.
-12. In combat, the Pawn independently evaluates the situation and plays its own turn.
-13. A player-authored Character Profile shapes role-playing and tactical choices.
-14. Player setup should eventually be close to: connect, choose Pawn Actor, add Character Profile, connect AI, play.
-15. Local/solo play should remain simpler than remote play.
-16. Start with one complete Pawn before generalizing.
-17. Assistant DM functionality is a later, separate scope.
+1. Every human player uses their own Foundry identity and controls their own character.
+2. Every AI Pawn uses a dedicated AI Foundry identity and controls its assigned Pawn.
+3. Human and AI players may be connected to the same world simultaneously in separate sessions/windows.
+4. Human access and AI access remain separate routes.
+5. The AI route uses Cloudflare MCP.
+6. The human route uses the normal human/player API access path.
+7. Foundry permissions remain the first authority for which account can control which Actor.
+8. The gateway additionally binds the expected AI identity to the expected Pawn.
+9. The AI receives only state appropriate to its Foundry user/Actor.
+10. Foundry remains authoritative for mechanics and outcomes.
+11. Outside combat, the Pawn normally accompanies its associated human player as a role-playing behavior, not because they share control.
+12. Relevant conversations involving the associated human/party can become Pawn context.
+13. The AI may naturally participate in dialogue according to Character Profile and judgment.
+14. Explicit player instructions can guide current Pawn priorities.
+15. In combat, the Pawn independently plays its own turns.
+16. A player-authored Character Profile shapes choices without scripting them.
+17. Start with one human + one AI Pawn pair before generalizing.
+18. Assistant DM functionality remains a later, separate scope.
 
 ## Product boundaries
 
-The system defines **functions and boundaries**, not a universal personality.
+The system defines:
 
-It should define:
-
+- AI-user/Pawn identity binding,
 - what the Pawn can perceive,
-- which Actor it is assigned to,
-- which legal actions it can take,
-- what game context it receives,
-- how stale state and failures are handled,
-- which system is authoritative.
+- legitimate Pawn actions,
+- role-playing context,
+- state freshness,
+- execution/reconciliation behavior.
 
-It should not prescribe:
+It does not prescribe:
 
-- personality,
+- universal personality,
 - morality,
-- tactical style,
+- tactics,
 - loyalty,
-- speech style,
+- dialogue frequency,
 - motivations,
-- emotional responses,
-- whether the Pawn speaks in a given moment.
+- emotional responses.
 
-Those belong to the Character Profile and the AI's interpretation of the live game state.
+Those belong to the Character Profile and AI interpretation.
 
 ## First-version non-goals
 
-- Assistant DM world editing
-- arbitrary JavaScript execution for the AI
-- support for every Foundry game system
-- universal Pawn behavior rules
-- large multi-agent orchestration
-- AI-authored mechanical outcomes when Foundry can determine them
+- sharing the human's login/session with the AI,
+- shared Actor control,
+- browser-loopback control of a human session,
+- Assistant DM world editing,
+- arbitrary JavaScript execution,
+- every Foundry game system,
+- universal Pawn behavior rules,
+- large multi-agent orchestration.
 
 ## Definition of done for Version 1
 
-Version 1 is complete when one real player can run one AI Pawn through a normal session and:
+Version 1 is complete when a human player and an AI Pawn can participate in the same normal session and:
 
-- the Pawn is bound to one Actor,
-- the Pawn understands its current character and game state,
-- the Pawn accompanies its player outside combat,
-- the Pawn receives and can participate in relevant conversations,
-- a player-authored Character Profile influences choices,
-- the Pawn can move, speak, attack, use a spell/ability or item, and end its turn through legitimate Foundry mechanics,
-- the Pawn independently chooses actions in combat,
-- Foundry resolves mechanics and outcomes,
-- explicit player instructions can guide current priorities,
-- stale/conflicting actions fail cleanly and force a refresh,
-- a normal player can set it up from documentation.
+- each uses a separate Foundry account/session,
+- the human route controls the human Actor,
+- the Cloudflare MCP route controls the Pawn through the AI account,
+- attempts by the AI account to control the human Actor are rejected,
+- the Pawn receives permitted game state and conversation context,
+- Character Profile influences decisions,
+- the Pawn accompanies the human in exploration by default,
+- the Pawn can speak and role-play,
+- the Pawn can move, attack, cast/use an ability or item, and end its turn,
+- the Pawn independently chooses its combat actions,
+- Foundry resolves mechanics,
+- stale/duplicate/uncertain actions are handled safely.
 
-If the Pawn feels like another character at the table rather than a macro, second DM, or scripted chatbot, the project is achieving its goal.
+If the table experiences the Pawn as another player-character rather than shared automation, the product is working.

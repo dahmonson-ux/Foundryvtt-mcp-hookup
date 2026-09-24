@@ -1,61 +1,92 @@
-# Deployment Modes
+# Deployment and Access Model
 
-Deployment comes after the product contract.
+The target deployment has two player routes into the same Foundry world.
 
-The first engineering task is a connection spike, not a commitment to one transport.
-
-## Local / solo
-
-If Foundry and the AI tooling are in the same trusted environment, use the simplest local connection available.
-
-Do not force remote-player plumbing into local play.
-
-## Remote player
-
-If Foundry is hosted elsewhere, the Pawn still needs legitimate player-level access to:
-
-- its assigned Actor,
-- relevant player-visible state,
-- legal game actions,
-- conversation context.
-
-The exact connection is deliberately undecided until tested.
-
-Possible candidates may include:
-
-- an existing player API,
-- a Foundry client/module integration,
-- another supported player-level route.
-
-## Selection criteria
-
-Choose the connection that best satisfies:
-
-1. **Simplicity** — fewest moving parts and least player configuration.
-2. **Reliability** — predictable reconnects, permissions, state freshness, and execution results.
-3. **Role-playing quality** — low enough latency and rich enough context for natural conversation and play.
-
-## Non-negotiable behavior
-
-Regardless of transport:
-
-- the AI is bound to one Pawn Actor,
-- Foundry permissions remain authoritative,
-- the AI receives only appropriate player-visible context,
-- stale actions expire,
-- Foundry resolves game mechanics,
-- arbitrary JavaScript is not a normal Pawn capability.
-
-## Phase 1 exit criterion
-
-The winning connection must prove one Pawn can:
+## Human player route
 
 ```text
-identify its Actor
-read state
-read relevant scene/context
-speak
-move
+Human player
+→ human/player API access
+→ Human Foundry account
+→ Human Actor
 ```
 
-Only then should the project commit to a production transport.
+The human keeps a normal independent player session.
+
+Human play should not depend on the AI gateway.
+
+## AI player route
+
+```text
+AI
+→ Cloudflare MCP
+→ AI Foundry account
+→ Pawn Actor
+```
+
+The AI account is a real separate Foundry player identity.
+
+It should own only the Actor(s) intentionally assigned to that AI player.
+
+## Simultaneous play
+
+Human and AI sessions can be open at the same time.
+
+Example:
+
+```text
+World
+├── Human User A → Human Character A
+├── AI User A    → Pawn A
+├── Human User B → Human Character B
+└── AI User B    → Pawn B
+```
+
+There is no requirement for one browser/session to proxy another player's authority.
+
+## Permission model
+
+Foundry permissions are the first boundary.
+
+The AI route must also validate the expected AI-user/Pawn binding.
+
+Required negative test:
+
+```text
+AI User A
+→ attempts Human Character A
+→ denied
+```
+
+Also test:
+
+```text
+AI User A
+→ attempts Pawn B
+→ denied unless intentionally granted
+```
+
+## Phase 1 target
+
+Phase 1 no longer evaluates browser-loopback control.
+
+It validates the selected two-route deployment:
+
+- human player through human API access,
+- AI player through Cloudflare MCP,
+- separate Foundry identities,
+- separate Actors,
+- simultaneous participation.
+
+The AI route must prove:
+
+```text
+authenticate as AI user
+→ identify Pawn
+→ read permitted state
+→ receive relevant visible conversation
+→ speak
+→ move
+→ confirm state
+→ fail to control an unowned human Actor
+```

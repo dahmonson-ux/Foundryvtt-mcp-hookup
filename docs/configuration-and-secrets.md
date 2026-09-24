@@ -1,10 +1,32 @@
 # Configuration and Secrets
 
-Configuration should remain minimal until a concrete connection implementation proves it needs additional values.
+Humans and AI use separate Foundry identities and separate access paths.
+
+## Human credentials
+
+Human player credentials belong only to the human/player access route.
+
+Do not copy human credentials into the AI configuration.
+
+## AI credentials
+
+The AI route uses Cloudflare MCP and a dedicated AI Foundry user.
+
+The runtime may need configuration for:
+
+- Cloudflare MCP connection/authentication,
+- AI Foundry user identity,
+- assigned Pawn Actor,
+- gateway authentication,
+- deployment-specific Foundry connection information.
+
+Exact Cloudflare MCP environment-variable names should be added only when the real deployed MCP interface is known.
+
+Do not invent placeholder protocol details that may not match the actual service.
 
 ## Current reference settings
 
-The example environment contains:
+The repository still contains generic gateway/development values such as:
 
 ```text
 GATEWAY_HOST
@@ -16,33 +38,24 @@ FOUNDRY_BASE_URL
 FOUNDRY_BRIDGE_SECRET
 ```
 
-Not every deployment needs every setting.
+These are development/reference values, not a claim that the final Cloudflare MCP integration uses all of them.
 
 ## Actor assignment
 
-`AI_ACTOR_UUID` identifies the Pawn Actor for a runtime that chooses to configure Actor assignment through environment variables.
+`AI_ACTOR_UUID` identifies the intended Pawn Actor when that configuration style is used.
 
-Actor assignment does not grant permission.
+Actor assignment is not authorization.
 
-The chosen Foundry connection must still enforce player/Actor authority.
-
-## Transport-specific configuration
-
-The production remote-player transport is intentionally undecided.
-
-Do not add speculative credential/tunnel/session configuration to the public template.
-
-Add transport-specific values only after the connection spike proves they are required.
+Authorization comes from the dedicated AI Foundry user's actual permissions plus gateway scope checks.
 
 ## Never commit
 
-- passwords,
-- API keys,
+- human passwords/API credentials,
+- AI account credentials,
+- Cloudflare tokens/secrets,
 - bearer tokens,
-- browser cookies/session tokens,
-- tunnel credentials,
+- browser/session cookies,
 - private signing keys,
-- temporary pairing credentials,
 - personal player data,
 - private prompts/chat logs,
 - absolute local paths,
@@ -50,17 +63,8 @@ Add transport-specific values only after the connection spike proves they are re
 
 ## Character Profile data
 
-Character Profiles may contain private player-authored material.
+Character Profiles may contain private player-authored content.
 
-A deployment should decide whether profiles are:
+Keep profile/backstory storage explicit and separate from credentials.
 
-- local files,
-- Foundry data,
-- application data,
-- ephemeral session input.
-
-Do not silently publish profile/backstory content.
-
-## Placeholder behavior
-
-Reference loaders may reject required values that still begin with `INSERT_` so examples cannot accidentally become live credentials.
+Do not silently publish it in source control or logs.

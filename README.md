@@ -1,140 +1,247 @@
 # Foundry VTT AI Pawn
 
-A project for letting an AI legitimately play a character alongside a human player in Foundry VTT.
+This project lets a human player and an AI Pawn play in the same Foundry VTT world as **separate players with separate accounts and separate control paths**.
 
-## North Star
+## The player experience
 
-> Every technical decision should make the system simpler, more reliable, or improve the role-playing experience.
-
-The target experience is straightforward:
+From the table's perspective, there are simply two players:
 
 ```text
-Human plays their character.
-
-AI Pawn accompanies them,
-participates in the adventure,
-joins conversations,
-and independently plays its own turns in combat.
+                         SAME FOUNDRY WORLD
+                                │
+                 ┌──────────────┴──────────────┐
+                 │                             │
+           HUMAN PLAYER                   AI PLAYER
+                 │                             │
+          Human access                    Cloudflare MCP
+            / API                              │
+                 │                             │
+       Human Foundry account           AI Foundry account
+                 │                             │
+          Human character                  AI Pawn
 ```
 
-This repository is intentionally shifting away from architecture-first development. The first priority is one complete, playable Pawn. Transport and deployment abstractions should follow what the working vertical slice proves we actually need.
+The human and AI do **not** share a Foundry account, browser session, or Actor.
 
-## Product model
-
-There are three distinct layers:
+That means there is no normal control overlap:
 
 ```text
-PAWN FUNCTIONAL CONTRACT
-What the Pawn may perceive and do
-        +
-CHARACTER PROFILE
-Who the Pawn is
-        +
-LIVE GAME CONTEXT
-What is happening now
-        ↓
-AI DECISION
-        ↓
-LEGITIMATE FOUNDRY ACTION
+Human account → Human Actor
+AI account    → Pawn Actor
 ```
 
-The functional layer does **not** define a universal Pawn personality.
+Both can be connected to the same world at the same time in their own sessions/windows.
 
-The player can provide a Character Profile containing backstory, personality, values, goals, fears, bonds, flaws, speech style, combat tendencies, role-playing notes, and freeform context.
+## What the human player does
 
-Foundry remains authoritative for game permissions and mechanics.
+The human plays normally.
 
-## Core behavior
+They:
 
-### Outside combat
+- sign in through the human/player access route,
+- control their own Foundry character,
+- move, roll, talk, and interact normally,
+- give the Pawn instructions when they want to,
+- role-play with the Pawn like another party member.
 
-The Pawn accompanies its assigned player by default.
+The human does not need to drive the Pawn's combat turn.
 
-If the player enters a conversation, the Pawn receives relevant conversation context and may participate naturally according to its Character Profile and judgment.
+## What the AI player does
 
-The Pawn may act independently when explicitly instructed or when the role/context clearly calls for it.
+The AI has its own Foundry player identity and its own Pawn Actor.
 
-### In combat
+Its decision context can include:
 
-The Pawn independently plays its own turn:
+- Character Profile,
+- backstory/personality,
+- current player instruction,
+- visible Foundry state,
+- current combat state,
+- relevant conversation context,
+- campaign/character memory.
+
+The AI then uses the Cloudflare MCP route to perform legitimate actions available to its Foundry account.
 
 ```text
-read current state
-→ inspect legitimate actions
-→ decide as the character
-→ execute through Foundry
-→ observe result
-→ continue if appropriate
-→ end turn
+Character Profile
+Player Instruction
+Foundry-visible state
+Conversation context
+        │
+        ▼
+       AI
+        │
+        ▼
+Cloudflare MCP
+        │
+        ▼
+AI Foundry account
+        │
+        ▼
+      Pawn Actor
 ```
 
-The human should not need to pick every Pawn action.
+## Why the two-route model matters
 
-## Foundry stays authoritative
+The human and AI are separate participants instead of two controllers fighting over one session.
 
-The AI chooses strategy and intent.
+This gives us a cleaner authority model:
+
+- Foundry already knows which user owns which Actor.
+- The human keeps complete control of the human PC.
+- The AI keeps control of the Pawn.
+- The gateway can still validate expected AI-user/Actor binding.
+- A bad or stale AI action cannot silently become control of the human's Actor.
+- The Pawn relationship to the human is role-playing context, not shared technical control.
+
+## Role-playing behavior
+
+### Exploration and towns
+
+The human leads their own character normally.
+
+The Pawn is a separate player, but its default companion behavior is to accompany the associated human character unless instructed otherwise or character/context gives it a reason to act independently.
+
+### Conversations
+
+When the human is part of a conversation, relevant dialogue can be included in the AI Pawn's context.
+
+The Pawn may:
+
+- listen,
+- respond,
+- ask a question,
+- disagree,
+- joke,
+- react,
+- remain silent.
+
+The infrastructure does not force dialogue. The Character Profile and AI decide what is natural.
+
+### Combat
+
+On the Pawn's turn:
+
+```text
+AI reads state
+→ sees legitimate current actions
+→ decides as the character
+→ sends action through Cloudflare MCP
+→ Foundry resolves mechanics as the AI user
+→ AI observes the result
+→ continues or ends turn
+```
+
+The human continues playing the human PC through the human route.
+
+## Character Profile
+
+The functional contract defines what the Pawn can perceive and do.
+
+The Character Profile defines who the Pawn is.
+
+Players can provide:
+
+- name,
+- backstory,
+- personality,
+- values/beliefs,
+- goals,
+- fears,
+- bonds/relationships,
+- flaws,
+- likes/dislikes,
+- speech style,
+- attitude toward the associated human/party,
+- combat tendencies,
+- freeform role-playing notes.
+
+Profiles inform decisions without turning the Pawn into a fixed behavior script.
+
+## Foundry remains authoritative
+
+The AI chooses intent and strategy.
 
 Foundry and the installed game system determine:
 
 - permissions,
+- Actor ownership,
 - legal movement,
 - target validity,
 - rolls,
 - damage/healing,
 - saving throws/checks,
 - conditions,
-- spell slots/resources,
-- item consumption,
+- resources,
 - turn order,
 - final mechanical outcomes.
 
 The AI should not invent a result Foundry can resolve.
 
-## First playable slice
+## Current architecture
 
-Do not start by solving every deployment case.
+The permanent code keeps a small provider-neutral core:
 
-The first milestone is one real Pawn that can:
+```text
+AI decision
+   ↓
+GatewayCore
+   ↓
+state-bound legal action
+   ↓
+Foundry adapter
+   ↓
+Cloudflare MCP / AI-player route
+   ↓
+AI Foundry account
+   ↓
+Pawn
+```
 
-- identify its assigned Actor,
-- read relevant Actor/scene state,
-- accompany its player,
-- receive conversation context,
-- speak,
-- move,
-- recognize its combat turn,
-- inspect legitimate actions,
-- attack,
-- use one spell/ability path,
-- use one item path,
-- observe results,
-- end its turn.
+The human route does not pass through the AI gateway:
 
-Once that works, generalize only what the working implementation proves necessary.
+```text
+Human
+  ↓
+Human API/player access
+  ↓
+Human Foundry account
+  ↓
+Human Actor
+```
+
+Both routes meet inside the same Foundry world.
 
 ## Current engineering phase
 
-**Phase 1 — Connection Spike is active.**
+**Phase 1 now validates the two-player access model.**
 
-The disposable probe lives in [spikes/phase1](spikes/phase1/README.md). It tests one player-browser/loopback candidate against the product acceptance test without promoting that candidate into the permanent architecture.
+The previous shared-browser/loopback spike has been retired.
 
-The spike is successful only if one assigned Pawn can read its state and scene, receive visible conversation context, speak through Foundry, move through Foundry, and confirm the resulting state while remaining under the logged-in player's permissions.
+Phase 1 must prove:
 
-## Connection strategy
+### Human route
 
-The transport is deliberately **not locked yet**.
+- human signs in as the human Foundry user,
+- human controls only the intended human Actor(s),
+- normal player behavior is unaffected by the AI route.
 
-Phase 1 is a connection spike. Test the practical player-level connection paths available in the target Foundry setup and choose the one that best satisfies:
+### AI route
 
-1. simplicity,
-2. reliability,
-3. role-playing responsiveness.
+- AI connects through Cloudflare MCP,
+- AI authenticates as a dedicated AI Foundry user,
+- AI user owns the intended Pawn,
+- AI can read its permitted game state,
+- AI can receive relevant visible conversation,
+- AI can speak,
+- AI can move,
+- Foundry rejects attempts to control the human Actor or another unowned Actor.
 
-Possible implementations may use an existing player API, a Foundry client/module bridge, or another supported integration. The product contract should not depend on which transport wins.
+See [spikes/phase1/README.md](spikes/phase1/README.md).
 
 ## Core gateway contract
 
-The existing state-bound affordance gateway remains useful because it prevents guessed or stale actions:
+The gateway remains useful on the AI route for state freshness, scope, idempotency, and uncertain execution:
 
 ```text
 getAvailableActions(agent_id, state_version?)
@@ -143,22 +250,20 @@ proposeAction(agent_id, proposal, state_version, idempotency_key)
 reconcileAction(command_id, idempotency_key)
 ```
 
-The AI should choose from actions actually available in the current state.
-
-If the human or world changes state first, an old action expires and the AI refreshes rather than fighting the new state.
+It is not responsible for controlling the human player's character.
 
 ## Documentation
 
 Start here:
 
 - [PRODUCT.md](PRODUCT.md) — product goals and Version 1 definition of done
-- [docs/pawn-functional-contract.md](docs/pawn-functional-contract.md) — what a Pawn can perceive and do
-- [docs/character-profile.md](docs/character-profile.md) — player-authored identity/backstory layer
-- [docs/roleplaying-behavior.md](docs/roleplaying-behavior.md) — exploration, conversation, and combat assumptions
-- [docs/implementation-plan.md](docs/implementation-plan.md) — phased vertical-slice roadmap
-- [docs/action-affordances.md](docs/action-affordances.md) — game-action vocabulary
-- [docs/execution-lifecycle.md](docs/execution-lifecycle.md) — stale state, idempotency, and reconciliation
-- [docs/failure-matrix.md](docs/failure-matrix.md) — reliability cases
+- [docs/player-perspective.md](docs/player-perspective.md) — human and AI player experience
+- [docs/architecture.md](docs/architecture.md) — dual-route architecture
+- [docs/pawn-functional-contract.md](docs/pawn-functional-contract.md) — AI Pawn capabilities/boundaries
+- [docs/character-profile.md](docs/character-profile.md) — player-authored identity/backstory
+- [docs/roleplaying-behavior.md](docs/roleplaying-behavior.md) — exploration, conversation, and combat behavior
+- [docs/implementation-plan.md](docs/implementation-plan.md) — phased roadmap
+- [spikes/phase1/README.md](spikes/phase1/README.md) — current Cloudflare MCP validation plan
 
 Example profile:
 
@@ -178,16 +283,16 @@ packages/
     foundry/
     mock/
   ledger/
+spikes/
+  phase1/
 ```
-
-The packages are intentionally transport-neutral. A connection implementation should sit behind the Foundry adapter boundary after the connection spike identifies the simplest viable path.
 
 ## Current implementation
 
 The code currently provides:
 
-- provider-neutral contracts,
-- Actor-scoped identities/capabilities,
+- Character/Profile role-play contracts,
+- Actor-scoped agent identities,
 - state-bound action affordances,
 - stale-action rejection,
 - idempotency/duplicate suppression,
@@ -196,7 +301,7 @@ The code currently provides:
 - Foundry adapter boundary,
 - mock vertical-slice tests.
 
-What it does **not** yet provide is a finished production connection to a live Foundry player session. That is the next engineering milestone.
+The Cloudflare MCP → dedicated AI Foundry user integration is the next live integration target.
 
 ## Development
 
@@ -210,27 +315,11 @@ npm install
 npm run check
 ```
 
-The current tests run against synthetic/mock state and do not require a real Foundry world.
+## North Star
 
-## First-version scope
+> Every technical decision should make the system simpler, more reliable, or improve the role-playing experience.
 
-In scope:
-
-- AI player/Pawn
-- player-authored Character Profile
-- exploration companion behavior
-- conversation participation
-- autonomous combat turns
-- legitimate Foundry mechanics
-- remote-player support after the connection spike proves the path
-
-Not in scope yet:
-
-- Assistant DM world building/editing
-- arbitrary JavaScript execution
-- every Foundry game system
-- universal behavior scripting
-- large multi-agent orchestration
+If the Pawn feels like another character at the table rather than a macro, second DM, or scripted chatbot, the project is achieving its goal.
 
 ## License
 
