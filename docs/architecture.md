@@ -1,136 +1,153 @@
 # Architecture
 
-The architecture exists to support a playable AI Pawn, not to dictate how every deployment must connect to Foundry.
+The architecture has two access routes into one Foundry world.
 
-## Product boundary
+## Top-level model
+
+```text
+                         FOUNDRY WORLD
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+          HUMAN ROUTE                     AI ROUTE
+              │                               │
+      Human API/access                  Cloudflare MCP
+              │                               │
+    Human Foundry account              AI Foundry account
+              │                               │
+       Human Actor                         Pawn Actor
+```
+
+The routes share game state through Foundry but do not share account/session/Actor control.
+
+## Human route
+
+The human route is intentionally outside the AI gateway.
+
+```text
+Human
+  ↓
+human/player API access
+  ↓
+Human Foundry user
+  ↓
+Human Actor
+```
+
+Humans play normally.
+
+The AI architecture must not make ordinary human play dependent on the AI gateway.
+
+## AI route
 
 ```text
 Character Profile
-        +
-Live Game Context
-        +
 Current Player Instruction
-        ↓
+Foundry-visible state
+Conversation context
+Relevant memory
+        │
+        ▼
        AI
-        ↓
-state-bound legal action
-        ↓
-GatewayCore
-        ↓
+        │
+        ▼
+ GatewayCore
+        │
+        ▼
 Foundry adapter
-        ↓
-chosen player-level connection
-        ↓
-Foundry VTT
+        │
+        ▼
+Cloudflare MCP
+        │
+        ▼
+AI Foundry user
+        │
+        ▼
+Pawn Actor
 ```
 
-The connection below the Foundry adapter is intentionally replaceable.
+## Identity boundary
 
-## Responsibilities
+The expected binding is:
 
-### AI
+```text
+AI agent
+→ dedicated AI Foundry user
+→ assigned Pawn Actor
+```
 
-The AI owns:
+Foundry user permissions are authoritative.
 
-- role-playing interpretation,
-- tactical judgment,
-- dialogue,
-- choice among legitimate actions.
+The gateway still validates that the agent is acting through the expected Pawn identity and current legitimate actions.
 
-The AI does not own mechanical outcomes.
+## Why there is no normal control overlap
 
-### Character Profile
+The human and AI do not share:
 
-The Character Profile supplies:
+- Foundry login,
+- browser/session,
+- Actor ownership,
+- command channel.
 
-- backstory,
-- personality,
-- values,
-- goals,
-- fears,
-- bonds,
-- flaws,
-- speech style,
-- combat tendencies,
-- freeform player guidance.
+The human may give the Pawn instructions as game/role-playing context, but that is not technical co-control of the Pawn.
 
-It informs decisions without scripting them.
+## Role-playing relationship
 
-### GatewayCore
+The associated human character is context for the Pawn:
 
-The gateway owns:
+- who it normally accompanies,
+- whose conversations are often relevant,
+- who may give it current instructions,
+- who may have a relationship represented in Character Profile.
 
-- agent/Actor binding,
+This association does not grant the human route access to the AI route or vice versa.
+
+## Gateway responsibilities
+
+The gateway on the AI route owns:
+
+- AI-agent/Pawn binding,
 - capability checks,
 - action freshness,
 - offered-action validation,
 - idempotency,
 - uncertain-outcome reconciliation.
 
-It should remain small.
+It does not own:
 
-### Affordance resolver
+- human character control,
+- personality interpretation,
+- tactical strategy,
+- mechanical outcomes.
 
-The resolver filters current candidate actions into choices valid for:
+## Foundry adapter
 
-- this Actor,
-- this state,
-- this turn,
-- this capability set.
+The Foundry adapter translates the project contract into the action/state behavior exposed through the AI route.
 
-### Foundry adapter
+Foundry remains authoritative for:
 
-The adapter translates between the project contract and the installed Foundry/game-system behavior.
-
-Foundry remains authoritative for game state, permissions, and mechanics.
-
-### Connection implementation
-
-The connection implementation is not yet fixed.
-
-Phase 1 should prove the simplest viable player-level path for the actual target setup.
-
-Possible implementations may include:
-
-- an existing player API,
-- a client/module bridge,
-- another supported integration.
-
-Do not let the public Pawn contract depend on transport-specific details.
+- user permissions,
+- Actor ownership,
+- game state,
+- legal mechanics,
+- results.
 
 ## State freshness
 
-Actions are ephemeral.
+Actions are ephemeral:
 
 ```text
-state 145
+AI receives state 145
 → action offered
-→ human/world changes state
-→ state 146
+→ world changes to 146
 → old action rejected
-→ refresh
+→ AI refreshes and decides again
 ```
 
-This is the primary mechanism for avoiding human/AI tug-of-war.
-
-## Role-playing context
-
-The state path should eventually provide:
-
-- assigned Pawn state,
-- relevant scene state,
-- visible entities,
-- combat/turn state,
-- relevant conversation,
-- assigned-player context,
-- current player instruction,
-- Character Profile,
-- relevant memory.
-
-The gateway does not decide how the AI interprets that context.
+This protects against changing world state. It is no longer primarily a human-vs-AI shared-control mechanism because the human and AI own different Actors.
 
 ## Version 1 boundary
 
-Version 1 is about an AI player/Pawn.
+Version 1 is an AI player/Pawn system.
 
-Assistant DM/world-authoring capabilities are intentionally outside this architecture until the Pawn experience works end to end.
+Assistant DM/world-authoring remains separate.
