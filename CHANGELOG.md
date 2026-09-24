@@ -2,15 +2,16 @@
 
 ## Unreleased
 
-Shared-controller remote-player architecture:
+Product-goals revamp:
 
-- replaced the remote REST-relay client plan with a browser-session `PlayerClientBridge`
-- remote players now share their already-authenticated Foundry browser client with the AI
-- added Actor-scope checks against the current player session
-- removed the relay API client and relay-specific credentials
-- added player-client setup, protocol, transport, security, and deployment documentation
-- kept the local/solo Foundry bridge path unchanged
-- removed legacy remote-gateway configuration fields from the reference config loader
+- refocused the repository on one playable AI Pawn before architecture generalization
+- added a product North Star: simpler, more reliable, better role-playing
+- separated the Pawn Functional Contract from the player-authored Character Profile
+- defined default companion behavior for exploration and natural conversation participation
+- added a phased vertical-slice implementation plan
+- made the remote-player connection a Phase 1 engineering decision instead of a fixed browser/relay architecture
+- moved Assistant DM/world-authoring work out of Version 1 scope
+- added a Character Profile example
 
 ## 0.1.0
 
@@ -26,4 +27,3 @@ Initial public architecture scaffold:
 - privacy-aware in-memory ledger
 - Foundry adapter boundary
 - mock adapter and first vertical-slice tests
-- security, failure-matrix, privacy, and transport documentation
